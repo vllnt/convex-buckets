@@ -62,21 +62,35 @@ export const get = query({
 });
 
 export const listMembers = query({
-  args: { bucketRef: v.string(), scope: v.optional(v.string()) },
+  args: {
+    bucketRef: v.string(),
+    limit: v.optional(v.number()),
+    scope: v.optional(v.string()),
+  },
   returns: v.array(memberState),
-  handler: (ctx, a) => buckets.listMembers(ctx, a.bucketRef, a.scope),
+  handler: (ctx, a) =>
+    buckets.listMembers(ctx, a.bucketRef, a.scope, a.limit),
 });
 
 export const eraseBucket = mutation({
-  args: { bucketRef: v.string(), scope: v.optional(v.string()) },
+  args: {
+    batch: v.optional(v.number()),
+    bucketRef: v.string(),
+    scope: v.optional(v.string()),
+  },
   returns: v.number(),
-  handler: (ctx, a) => buckets.eraseBucket(ctx, a.bucketRef, a.scope),
+  handler: (ctx, a) => buckets.eraseBucket(ctx, a.bucketRef, a.scope, a.batch),
 });
 
 export const eraseSubject = mutation({
-  args: { subjectRef: v.string(), scope: v.optional(v.string()) },
+  args: {
+    batch: v.optional(v.number()),
+    scope: v.optional(v.string()),
+    subjectRef: v.string(),
+  },
   returns: v.number(),
-  handler: (ctx, a) => buckets.eraseSubject(ctx, a.subjectRef, a.scope),
+  handler: (ctx, a) =>
+    buckets.eraseSubject(ctx, a.subjectRef, a.scope, a.batch),
 });
 
 export const openTenant = mutation({

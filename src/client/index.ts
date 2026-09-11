@@ -11,7 +11,7 @@ import type {
   MemberState,
   OpenOptions,
 } from "./types.js";
-import { DEFAULT_SCOPE } from "../shared.js";
+import { DEFAULT_ERASE_BATCH, DEFAULT_LIST_LIMIT, DEFAULT_SCOPE } from "../shared.js";
 
 export interface BucketsComponent {
   mutations: {
@@ -48,13 +48,13 @@ export interface BucketsComponent {
     eraseBucket: FunctionReference<
       "mutation",
       "internal",
-      { scope: string; bucketRef: string },
+      { batch?: number; bucketRef: string; scope: string },
       number
     >;
     eraseSubject: FunctionReference<
       "mutation",
       "internal",
-      { scope: string; subjectRef: string },
+      { batch?: number; scope: string; subjectRef: string },
       number
     >;
   };
@@ -68,7 +68,7 @@ export interface BucketsComponent {
     listMembers: FunctionReference<
       "query",
       "internal",
-      { scope: string; bucketRef: string },
+      { bucketRef: string; limit?: number; scope: string },
       MemberState[]
     >;
   };
@@ -169,10 +169,12 @@ export class Buckets {
     ctx: RunQueryCtx,
     bucketRef: string,
     scope?: string,
+    limit?: number,
   ): Promise<MemberState[]> {
     return ctx.runQuery(this.component.queries.listMembers, {
-      scope: this.scopeOf(scope),
       bucketRef,
+      limit,
+      scope: this.scopeOf(scope),
     });
   }
 
@@ -180,10 +182,12 @@ export class Buckets {
     ctx: RunMutationCtx,
     bucketRef: string,
     scope?: string,
+    batch?: number,
   ): Promise<number> {
     return ctx.runMutation(this.component.mutations.eraseBucket, {
-      scope: this.scopeOf(scope),
+      batch,
       bucketRef,
+      scope: this.scopeOf(scope),
     });
   }
 
@@ -191,8 +195,10 @@ export class Buckets {
     ctx: RunMutationCtx,
     subjectRef: string,
     scope?: string,
+    batch?: number,
   ): Promise<number> {
     return ctx.runMutation(this.component.mutations.eraseSubject, {
+      batch,
       scope: this.scopeOf(scope),
       subjectRef,
     });

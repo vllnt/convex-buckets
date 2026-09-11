@@ -33,14 +33,14 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
       eraseBucket: FunctionReference<
         "mutation",
         "internal",
-        { bucketRef: string; scope: string },
+        { batch?: number; bucketRef: string; scope: string },
         number,
         Name
       >;
       eraseSubject: FunctionReference<
         "mutation",
         "internal",
-        { scope: string; subjectRef: string },
+        { batch?: number; scope: string; subjectRef: string },
         number,
         Name
       >;
@@ -84,7 +84,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
       listMembers: FunctionReference<
         "query",
         "internal",
-        { bucketRef: string; scope: string },
+        { bucketRef: string; limit?: number; scope: string },
         { joinedAt: number; subjectRef: string }[],
         Name
       >;

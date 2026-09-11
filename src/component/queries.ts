@@ -1,9 +1,14 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { query } from "./_generated/server";
+import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "../shared";
 import { bucketState, memberState } from "./validators";
 
+function fail(code: string, message: string): never {
+  throw new ConvexError({ code, message });
+}
+
 export const get = query({
-  args: { scope: v.string(), bucketRef: v.string() },
+  args: { bucketRef: v.string(), scope: v.string() },
   returns: v.union(v.null(), bucketState),
   handler: async (ctx, args) => {
     const bucket = await ctx.db
@@ -15,37 +20,43 @@ export const get = query({
     if (bucket === null) {
       return null;
     }
-    const members = await ctx.db
-      .query("members")
-      .withIndex("by_bucket", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
-      )
-      .collect();
     return {
       bucketRef: bucket.bucketRef,
-      status: bucket.status,
       capacity: bucket.capacity,
-      memberCount: members.length,
-      openedAt: bucket.openedAt,
-      lockedAt: bucket.lockedAt,
       closedAt: bucket.closedAt,
+      lockedAt: bucket.lockedAt,
+      memberCount: bucket.memberCount,
+      openedAt: bucket.openedAt,
+      status: bucket.status,
     };
   },
 });
 
 export const listMembers = query({
-  args: { scope: v.string(), bucketRef: v.string() },
+  args: {
+    bucketRef: v.string(),
+    limit: v.optional(v.number()),
+    scope: v.string(),
+  },
   returns: v.array(memberState),
   handler: async (ctx, args) => {
+    const raw = args.limit ?? DEFAULT_LIST_LIMIT;
+    if (!Number.isInteger(raw)) {
+      fail("INVALID_LIMIT", "limit must be a positive integer");
+    }
+    if (raw < 1) {
+      fail("INVALID_LIMIT", "limit must be a positive integer");
+    }
+    const limit = Math.min(raw, MAX_LIST_LIMIT);
     const members = await ctx.db
       .query("members")
       .withIndex("by_bucket", (q) =>
         q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
       )
-      .collect();
+      .take(limit);
     return members.map((member) => ({
-      subjectRef: member.subjectRef,
       joinedAt: member.joinedAt,
+      subjectRef: member.subjectRef,
     }));
   },
 });
