@@ -1,7 +1,7 @@
 {
   "name": "@vllnt/convex-buckets",
   "version": "0.1.0",
-  "description": "Ephemeral groups of opaque subject refs \u2014 matches, lobbies, cohorts \u2014 as a Convex component",
+  "description": "Ephemeral groups of opaque subject refs — matches, lobbies, cohorts — as a Convex component",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@9.15.4",
@@ -57,6 +57,7 @@
   },
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
+    "@types/node": "^22",
     "@typescript/native": "npm:typescript@7.0.2",
     "@vitest/coverage-v8": "^4.1.11",
     "@vllnt/eslint-config": "2.0.0",

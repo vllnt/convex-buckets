@@ -8,8 +8,9 @@
  * @module
  */
 
-import type * as example from "../example.js";
-import type * as runtimeCheck from "../runtimeCheck.js";
+import type * as actions from "../actions.js";
+import type * as mutations from "../mutations.js";
+import type * as queries from "../queries.js";
 
 import type {
   ApiFromModules,
@@ -18,8 +19,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  example: typeof example;
-  runtimeCheck: typeof runtimeCheck;
+  actions: typeof actions;
+  mutations: typeof mutations;
+  queries: typeof queries;
 }>;
 
 /**
@@ -50,4 +52,5 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   buckets: import("../../../src/component/_generated/component.js").ComponentApi<"buckets">;
+  isolated: import("../../../src/component/_generated/component.js").ComponentApi<"isolated">;
 };

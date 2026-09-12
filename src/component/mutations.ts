@@ -1,16 +1,18 @@
 import { ConvexError, v } from "convex/values";
-import { api, internal } from "./_generated/api";
-import {
-  internalMutation,
-  mutation,
-  type MutationCtx,
-} from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+
 import {
   DEFAULT_ERASE_BATCH,
   MAX_ERASE_BATCH,
   MAX_REF_LENGTH,
 } from "../shared";
+
+import { api, internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import {
+  internalMutation,
+  mutation,
+  type MutationCtx,
+} from "./_generated/server";
 
 function fail(code: string, message: string): never {
   throw new ConvexError({ code, message });
@@ -18,13 +20,16 @@ function fail(code: string, message: string): never {
 
 function requireRef(value: string, name: string): void {
   if (value.length === 0 || value.length > MAX_REF_LENGTH) {
-    fail("INVALID_REF", `${name} must be 1..${MAX_REF_LENGTH} characters`);
+    fail(
+      "INVALID_REF",
+      `${name} must be 1..${String(MAX_REF_LENGTH)} characters`,
+    );
   }
 }
 
 function parseBatch(batch: number | undefined): number {
   const raw = batch ?? DEFAULT_ERASE_BATCH;
-  if (!Number.isInteger(raw)) {
+  if (!Number.isSafeInteger(raw)) {
     fail("INVALID_BATCH", "batch must be a positive integer");
   }
   if (raw < 1) {
@@ -39,19 +44,20 @@ export const open = mutation({
     capacity: v.optional(v.number()),
     scope: v.string(),
   },
-  returns: v.string(),
-  handler: async (ctx, args) => {
-    if (args.capacity !== undefined) {
-      if (!Number.isSafeInteger(args.capacity) || args.capacity < 1) {
-        fail("INVALID_CAPACITY", "capacity must be a positive integer");
-      }
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    if (
+      arguments_.capacity !== undefined &&
+      (!Number.isSafeInteger(arguments_.capacity) || arguments_.capacity < 1)
+    ) {
+      fail("INVALID_CAPACITY", "capacity must be a positive integer");
     }
-    const bucketRef = args.bucketRef ?? crypto.randomUUID();
+    const bucketRef = arguments_.bucketRef ?? crypto.randomUUID();
     requireRef(bucketRef, "bucketRef");
     const existing = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", bucketRef),
       )
       .unique();
     if (existing !== null) {
@@ -62,14 +68,15 @@ export const open = mutation({
     }
     await ctx.db.insert("buckets", {
       bucketRef,
-      capacity: args.capacity,
+      capacity: arguments_.capacity,
       memberCount: 0,
       openedAt: Date.now(),
-      scope: args.scope,
+      scope: arguments_.scope,
       status: "open",
     });
     return bucketRef;
   },
+  returns: v.string(),
 });
 
 export const join = mutation({
@@ -78,14 +85,14 @@ export const join = mutation({
     scope: v.string(),
     subjectRef: v.string(),
   },
-  returns: v.object({ joined: v.boolean(), reason: v.optional(v.string()) }),
-  handler: async (ctx, args) => {
-    requireRef(args.bucketRef, "bucketRef");
-    requireRef(args.subjectRef, "subjectRef");
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    requireRef(arguments_.bucketRef, "bucketRef");
+    requireRef(arguments_.subjectRef, "subjectRef");
     const bucket = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
       .unique();
     if (bucket === null) {
@@ -98,9 +105,9 @@ export const join = mutation({
       .query("members")
       .withIndex("by_bucket_subject", (q) =>
         q
-          .eq("scope", args.scope)
-          .eq("bucketRef", args.bucketRef)
-          .eq("subjectRef", args.subjectRef),
+          .eq("scope", arguments_.scope)
+          .eq("bucketRef", arguments_.bucketRef)
+          .eq("subjectRef", arguments_.subjectRef),
       )
       .unique();
     if (existing !== null) {
@@ -113,16 +120,17 @@ export const join = mutation({
       return { joined: false, reason: "full" };
     }
     await ctx.db.insert("members", {
-      bucketRef: args.bucketRef,
+      bucketRef: arguments_.bucketRef,
       joinedAt: Date.now(),
-      scope: args.scope,
-      subjectRef: args.subjectRef,
+      scope: arguments_.scope,
+      subjectRef: arguments_.subjectRef,
     });
     await ctx.db.patch("buckets", bucket._id, {
       memberCount: bucket.memberCount + 1,
     });
     return { joined: true };
   },
+  returns: v.object({ joined: v.boolean(), reason: v.optional(v.string()) }),
 });
 
 export const leave = mutation({
@@ -131,14 +139,14 @@ export const leave = mutation({
     scope: v.string(),
     subjectRef: v.string(),
   },
-  returns: v.boolean(),
-  handler: async (ctx, args) => {
-    requireRef(args.bucketRef, "bucketRef");
-    requireRef(args.subjectRef, "subjectRef");
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    requireRef(arguments_.bucketRef, "bucketRef");
+    requireRef(arguments_.subjectRef, "subjectRef");
     const bucket = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
       .unique();
     if (bucket === null || bucket.status === "closed") {
@@ -148,9 +156,9 @@ export const leave = mutation({
       .query("members")
       .withIndex("by_bucket_subject", (q) =>
         q
-          .eq("scope", args.scope)
-          .eq("bucketRef", args.bucketRef)
-          .eq("subjectRef", args.subjectRef),
+          .eq("scope", arguments_.scope)
+          .eq("bucketRef", arguments_.bucketRef)
+          .eq("subjectRef", arguments_.subjectRef),
       )
       .unique();
     if (existing === null) {
@@ -162,17 +170,18 @@ export const leave = mutation({
     });
     return true;
   },
+  returns: v.boolean(),
 });
 
 export const lock = mutation({
   args: { bucketRef: v.string(), scope: v.string() },
-  returns: v.boolean(),
-  handler: async (ctx, args) => {
-    requireRef(args.bucketRef, "bucketRef");
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    requireRef(arguments_.bucketRef, "bucketRef");
     const bucket = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
       .unique();
     if (bucket === null || bucket.status !== "open") {
@@ -184,17 +193,18 @@ export const lock = mutation({
     });
     return true;
   },
+  returns: v.boolean(),
 });
 
 export const close = mutation({
   args: { bucketRef: v.string(), scope: v.string() },
-  returns: v.boolean(),
-  handler: async (ctx, args) => {
-    requireRef(args.bucketRef, "bucketRef");
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    requireRef(arguments_.bucketRef, "bucketRef");
     const bucket = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
       .unique();
     if (bucket === null || bucket.status === "closed") {
@@ -206,6 +216,7 @@ export const close = mutation({
     });
     return true;
   },
+  returns: v.boolean(),
 });
 
 export const eraseBucket = mutation({
@@ -214,19 +225,20 @@ export const eraseBucket = mutation({
     bucketRef: v.string(),
     scope: v.string(),
   },
-  returns: v.number(),
-  handler: async (ctx, args) => {
-    requireRef(args.bucketRef, "bucketRef");
-    const batch = parseBatch(args.batch);
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    requireRef(arguments_.bucketRef, "bucketRef");
+    const batch = parseBatch(arguments_.batch);
     const bucket = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
       .unique();
     if (bucket === null) return 0;
     return eraseBucketBatch(ctx, bucket._id, batch);
   },
+  returns: v.number(),
 });
 
 async function eraseBucketBatch(
@@ -249,23 +261,23 @@ async function eraseBucketBatch(
     await ctx.db.delete("buckets", bucketId);
   } else {
     await ctx.db.patch("buckets", bucketId, {
-      status: "closed",
       closedAt: bucket.closedAt ?? Date.now(),
       memberCount: Math.max(0, bucket.memberCount - members.length),
+      status: "closed",
     });
     await ctx.scheduler.runAfter(0, internal.mutations.continueEraseBucket, {
-      bucketId,
       batch,
+      bucketId,
     });
   }
   return members.length;
 }
 
 export const continueEraseBucket = internalMutation({
-  args: { bucketId: v.id("buckets"), batch: v.number() },
+  args: { batch: v.number(), bucketId: v.id("buckets") },
+  handler: async (ctx, arguments_) =>
+    eraseBucketBatch(ctx, arguments_.bucketId, parseBatch(arguments_.batch)),
   returns: v.number(),
-  handler: async (ctx, args) =>
-    eraseBucketBatch(ctx, args.bucketId, parseBatch(args.batch)),
 });
 
 export const eraseSubject = mutation({
@@ -274,14 +286,14 @@ export const eraseSubject = mutation({
     scope: v.string(),
     subjectRef: v.string(),
   },
-  returns: v.number(),
-  handler: async (ctx, args) => {
-    requireRef(args.subjectRef, "subjectRef");
-    const batch = parseBatch(args.batch);
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    requireRef(arguments_.subjectRef, "subjectRef");
+    const batch = parseBatch(arguments_.batch);
     const memberships = await ctx.db
       .query("members")
       .withIndex("by_subject", (q) =>
-        q.eq("scope", args.scope).eq("subjectRef", args.subjectRef),
+        q.eq("scope", arguments_.scope).eq("subjectRef", arguments_.subjectRef),
       )
       .take(batch);
     await Promise.all(
@@ -305,10 +317,11 @@ export const eraseSubject = mutation({
     if (memberships.length === batch) {
       await ctx.scheduler.runAfter(0, api.mutations.eraseSubject, {
         batch,
-        scope: args.scope,
-        subjectRef: args.subjectRef,
+        scope: arguments_.scope,
+        subjectRef: arguments_.subjectRef,
       });
     }
     return memberships.length;
   },
+  returns: v.number(),
 });

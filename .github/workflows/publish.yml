@@ -23,7 +23,7 @@ on:
 
 concurrency:
   group: publish-${{ github.event_name }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -165,7 +165,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           if git rev-parse "refs/tags/v$VERSION" >/dev/null 2>&1; then
-            echo "Tag v$VERSION already exists"
+            echo "Existing tag: stop for the verified recovery procedure in docs/VERIFICATION.md. Never retag."
             exit 1
           fi
 

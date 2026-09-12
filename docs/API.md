@@ -66,10 +66,8 @@ This is not a tombstone or snapshot: hosts needing privacy erasure must stop new
 joins for the subject until cleanup is complete. Concurrent joins can otherwise
 be included in later batches or survive after the last batch.
 
-Batch sizes and preview limits must be positive integers and are clamped to
+Batch sizes and preview limits must be positive safe integers and are clamped to
 their maximum. Invalid refs, capacity, batch and limit produce code-tagged
 `ConvexError`s (`INVALID_REF`, `INVALID_CAPACITY`, `INVALID_BATCH`,
-`INVALID_LIMIT`). Queries currently accept arbitrary string refs; mutation
-bucket/subject refs enforce 1..256 characters. Scope is an opaque string with no
-package-specific length limit. The host must authorize it; it is not an
-access-control boundary.
+`INVALID_LIMIT`). Scope, bucket and subject refs enforce 1..256 characters,
+including reads. The host must authorize scope; it is not an access-control boundary.

@@ -1,8 +1,7 @@
 <!-- convex-ai-start -->
 This project uses [Convex](https://convex.dev) as its backend.
 
-When working on Convex code, **always read `example/convex/_generated/ai/guidelines.md` first** for
-important guidelines on how to correctly use Convex APIs and patterns.
+When working on Convex code, follow the official [component authoring guidance](https://docs.convex.dev/components/authoring). Generated bindings are CLI-owned; do not fabricate missing guidance files.
 <!-- convex-ai-end -->
 
 # @vllnt/convex-buckets

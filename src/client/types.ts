@@ -1,33 +1,33 @@
 /** Public TypeScript surface for the buckets client. */
 
-export type BucketStatus = "open" | "locked" | "closed";
+export type BucketStatus = "closed" | "locked" | "open";
 
-export interface BucketState {
+export type BucketState = {
   bucketRef: string;
-  status: BucketStatus;
   capacity?: number;
+  closedAt?: number;
+  lockedAt?: number;
   memberCount: number;
   openedAt: number;
-  lockedAt?: number;
-  closedAt?: number;
-}
+  status: BucketStatus;
+};
 
-export interface MemberState {
-  subjectRef: string;
+export type MemberState = {
   joinedAt: number;
-}
+  subjectRef: string;
+};
 
-export interface JoinResult {
+export type JoinResult = {
   joined: boolean;
   reason?: string;
-}
+};
 
-export interface BucketsOptions {
+export type BucketsOptions = {
   defaultScope?: string;
-}
+};
 
-export interface OpenOptions {
-  scope?: string;
+export type OpenOptions = {
   bucketRef?: string;
   capacity?: number;
-}
+  scope?: string;
+};

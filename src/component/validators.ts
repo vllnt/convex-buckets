@@ -8,15 +8,15 @@ export const bucketStatus = v.union(
 
 export const bucketState = v.object({
   bucketRef: v.string(),
-  status: bucketStatus,
   capacity: v.optional(v.number()),
+  closedAt: v.optional(v.number()),
+  lockedAt: v.optional(v.number()),
   memberCount: v.number(),
   openedAt: v.number(),
-  lockedAt: v.optional(v.number()),
-  closedAt: v.optional(v.number()),
+  status: bucketStatus,
 });
 
 export const memberState = v.object({
-  subjectRef: v.string(),
   joinedAt: v.number(),
+  subjectRef: v.string(),
 });

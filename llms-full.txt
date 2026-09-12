@@ -122,10 +122,10 @@ pnpm test:coverage
 ```
 
 Unit tests use the simulated `convex-test` runtime (`@edge-runtime/vm`), not a
-real backend. `example/convex/runtimeCheck.ts` additionally checks concurrent
+real backend. `example/convex/actions.ts` additionally checks concurrent
 capacity admission and scheduled cleanup on a real local Convex backend. Run
 with an isolated HOME and
-`CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --local-cloud-port 3330 --local-site-port 3331 --run runtimeCheck:verify`.
+`CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --local-cloud-port 3330 --local-site-port 3331 --run actions:verify`.
 This is targeted evidence, not proof of every concurrency interleaving.
 
 ## Cleanup and isolation
@@ -268,13 +268,11 @@ This is not a tombstone or snapshot: hosts needing privacy erasure must stop new
 joins for the subject until cleanup is complete. Concurrent joins can otherwise
 be included in later batches or survive after the last batch.
 
-Batch sizes and preview limits must be positive integers and are clamped to
+Batch sizes and preview limits must be positive safe integers and are clamped to
 their maximum. Invalid refs, capacity, batch and limit produce code-tagged
 `ConvexError`s (`INVALID_REF`, `INVALID_CAPACITY`, `INVALID_BATCH`,
-`INVALID_LIMIT`). Queries currently accept arbitrary string refs; mutation
-bucket/subject refs enforce 1..256 characters. Scope is an opaque string with no
-package-specific length limit. The host must authorize it; it is not an
-access-control boundary.
+`INVALID_LIMIT`). Scope, bucket and subject refs enforce 1..256 characters,
+including reads. The host must authorize scope; it is not an access-control boundary.
 
 
 ---
@@ -320,37 +318,37 @@ export function clampListLimit(limit: number): number {
 ```ts
 /** Public TypeScript surface for the buckets client. */
 
-export type BucketStatus = "open" | "locked" | "closed";
+export type BucketStatus = "closed" | "locked" | "open";
 
-export interface BucketState {
+export type BucketState = {
   bucketRef: string;
-  status: BucketStatus;
   capacity?: number;
+  closedAt?: number;
+  lockedAt?: number;
   memberCount: number;
   openedAt: number;
-  lockedAt?: number;
-  closedAt?: number;
-}
+  status: BucketStatus;
+};
 
-export interface MemberState {
-  subjectRef: string;
+export type MemberState = {
   joinedAt: number;
-}
+  subjectRef: string;
+};
 
-export interface JoinResult {
+export type JoinResult = {
   joined: boolean;
   reason?: string;
-}
+};
 
-export interface BucketsOptions {
+export type BucketsOptions = {
   defaultScope?: string;
-}
+};
 
-export interface OpenOptions {
-  scope?: string;
+export type OpenOptions = {
   bucketRef?: string;
   capacity?: number;
-}
+  scope?: string;
+};
 
 ```
 
@@ -366,50 +364,23 @@ import type {
   PaginationOptions,
   PaginationResult,
 } from "convex/server";
+
+import { DEFAULT_SCOPE } from "../shared.js";
+
 import type {
-  BucketState,
-  BucketStatus,
   BucketsOptions,
+  BucketState,
   JoinResult,
   MemberState,
   OpenOptions,
 } from "./types.js";
-import {
-  DEFAULT_ERASE_BATCH,
-  DEFAULT_LIST_LIMIT,
-  DEFAULT_SCOPE,
-} from "../shared.js";
 
-export interface BucketsComponent {
+export type BucketsComponent = {
   mutations: {
-    open: FunctionReference<
-      "mutation",
-      "internal",
-      { scope: string; bucketRef?: string; capacity?: number },
-      string
-    >;
-    join: FunctionReference<
-      "mutation",
-      "internal",
-      { scope: string; bucketRef: string; subjectRef: string },
-      JoinResult
-    >;
-    leave: FunctionReference<
-      "mutation",
-      "internal",
-      { scope: string; bucketRef: string; subjectRef: string },
-      boolean
-    >;
-    lock: FunctionReference<
-      "mutation",
-      "internal",
-      { scope: string; bucketRef: string },
-      boolean
-    >;
     close: FunctionReference<
       "mutation",
       "internal",
-      { scope: string; bucketRef: string },
+      { bucketRef: string; scope: string },
       boolean
     >;
     eraseBucket: FunctionReference<
@@ -424,18 +395,36 @@ export interface BucketsComponent {
       { batch?: number; scope: string; subjectRef: string },
       number
     >;
+    join: FunctionReference<
+      "mutation",
+      "internal",
+      { bucketRef: string; scope: string; subjectRef: string },
+      JoinResult
+    >;
+    leave: FunctionReference<
+      "mutation",
+      "internal",
+      { bucketRef: string; scope: string; subjectRef: string },
+      boolean
+    >;
+    lock: FunctionReference<
+      "mutation",
+      "internal",
+      { bucketRef: string; scope: string },
+      boolean
+    >;
+    open: FunctionReference<
+      "mutation",
+      "internal",
+      { bucketRef?: string; capacity?: number; scope: string },
+      string
+    >;
   };
   queries: {
-    paginateMembers: FunctionReference<
-      "query",
-      "internal",
-      { bucketRef: string; scope: string; paginationOpts: PaginationOptions },
-      PaginationResult<MemberState>
-    >;
     get: FunctionReference<
       "query",
       "internal",
-      { scope: string; bucketRef: string },
+      { bucketRef: string; scope: string },
       BucketState | null
     >;
     listMembers: FunctionReference<
@@ -444,22 +433,28 @@ export interface BucketsComponent {
       { bucketRef: string; limit?: number; scope: string },
       MemberState[]
     >;
+    paginateMembers: FunctionReference<
+      "query",
+      "internal",
+      { bucketRef: string; paginationOpts: PaginationOptions; scope: string },
+      PaginationResult<MemberState>
+    >;
   };
-}
+};
 
-interface RunQueryCtx {
-  runQuery<Q extends FunctionReference<"query", "internal">>(
-    reference: Q,
-    args: FunctionArgs<Q>,
-  ): Promise<FunctionReturnType<Q>>;
-}
+type RunQueryCtx = {
+  runQuery<TQuery extends FunctionReference<"query", "internal">>(
+    reference: TQuery,
+    arguments_: FunctionArgs<TQuery>,
+  ): Promise<FunctionReturnType<TQuery>>;
+};
 
-interface RunMutationCtx {
-  runMutation<M extends FunctionReference<"mutation", "internal">>(
-    reference: M,
-    args: FunctionArgs<M>,
-  ): Promise<FunctionReturnType<M>>;
-}
+type RunMutationCtx = {
+  runMutation<TMutation extends FunctionReference<"mutation", "internal">>(
+    reference: TMutation,
+    arguments_: FunctionArgs<TMutation>,
+  ): Promise<FunctionReturnType<TMutation>>;
+};
 
 export class Buckets {
   private readonly defaultScope: string;
@@ -475,11 +470,11 @@ export class Buckets {
     return scope ?? this.defaultScope;
   }
 
-  open(ctx: RunMutationCtx, opts: OpenOptions = {}): Promise<string> {
+  open(ctx: RunMutationCtx, options: OpenOptions = {}): Promise<string> {
     return ctx.runMutation(this.component.mutations.open, {
-      scope: this.scopeOf(opts.scope),
-      bucketRef: opts.bucketRef,
-      capacity: opts.capacity,
+      bucketRef: options.bucketRef,
+      capacity: options.capacity,
+      scope: this.scopeOf(options.scope),
     });
   }
 
@@ -490,8 +485,8 @@ export class Buckets {
     scope?: string,
   ): Promise<JoinResult> {
     return ctx.runMutation(this.component.mutations.join, {
-      scope: this.scopeOf(scope),
       bucketRef,
+      scope: this.scopeOf(scope),
       subjectRef,
     });
   }
@@ -503,8 +498,8 @@ export class Buckets {
     scope?: string,
   ): Promise<boolean> {
     return ctx.runMutation(this.component.mutations.leave, {
-      scope: this.scopeOf(scope),
       bucketRef,
+      scope: this.scopeOf(scope),
       subjectRef,
     });
   }
@@ -515,8 +510,8 @@ export class Buckets {
     scope?: string,
   ): Promise<boolean> {
     return ctx.runMutation(this.component.mutations.lock, {
-      scope: this.scopeOf(scope),
       bucketRef,
+      scope: this.scopeOf(scope),
     });
   }
 
@@ -526,8 +521,8 @@ export class Buckets {
     scope?: string,
   ): Promise<boolean> {
     return ctx.runMutation(this.component.mutations.close, {
-      scope: this.scopeOf(scope),
       bucketRef,
+      scope: this.scopeOf(scope),
     });
   }
 
@@ -537,20 +532,20 @@ export class Buckets {
     scope?: string,
   ): Promise<BucketState | null> {
     return ctx.runQuery(this.component.queries.get, {
-      scope: this.scopeOf(scope),
       bucketRef,
+      scope: this.scopeOf(scope),
     });
   }
 
   paginateMembers(
     ctx: RunQueryCtx,
     bucketRef: string,
-    paginationOpts: PaginationOptions,
+    paginationOptions: PaginationOptions,
     scope?: string,
   ): Promise<PaginationResult<MemberState>> {
     return ctx.runQuery(this.component.queries.paginateMembers, {
       bucketRef,
-      paginationOpts,
+      paginationOpts: paginationOptions,
       scope: this.scopeOf(scope),
     });
   }
@@ -595,14 +590,14 @@ export class Buckets {
   }
 }
 
-export type {
-  BucketState,
-  BucketStatus,
-  BucketsOptions,
-  JoinResult,
-  MemberState,
-  OpenOptions,
-};
+export {
+  type BucketsOptions,
+  type BucketState,
+  type BucketStatus,
+  type JoinResult,
+  type MemberState,
+  type OpenOptions,
+} from "./types.js";
 
 ```
 
@@ -630,7 +625,11 @@ export default defineSchema({
     memberCount: v.number(),
     openedAt: v.number(),
     scope: v.string(),
-    status: v.union(v.literal("closed"), v.literal("locked"), v.literal("open")),
+    status: v.union(
+      v.literal("closed"),
+      v.literal("locked"),
+      v.literal("open"),
+    ),
   }).index("by_scope_ref", ["scope", "bucketRef"]),
   members: defineTable({
     bucketRef: v.string(),
@@ -660,17 +659,17 @@ export const bucketStatus = v.union(
 
 export const bucketState = v.object({
   bucketRef: v.string(),
-  status: bucketStatus,
   capacity: v.optional(v.number()),
+  closedAt: v.optional(v.number()),
+  lockedAt: v.optional(v.number()),
   memberCount: v.number(),
   openedAt: v.number(),
-  lockedAt: v.optional(v.number()),
-  closedAt: v.optional(v.number()),
+  status: bucketStatus,
 });
 
 export const memberState = v.object({
-  subjectRef: v.string(),
   joinedAt: v.number(),
+  subjectRef: v.string(),
 });
 
 ```
@@ -681,18 +680,20 @@ export const memberState = v.object({
 
 ```ts
 import { ConvexError, v } from "convex/values";
-import { api, internal } from "./_generated/api";
-import {
-  internalMutation,
-  mutation,
-  type MutationCtx,
-} from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+
 import {
   DEFAULT_ERASE_BATCH,
   MAX_ERASE_BATCH,
   MAX_REF_LENGTH,
 } from "../shared";
+
+import { api, internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import {
+  internalMutation,
+  mutation,
+  type MutationCtx,
+} from "./_generated/server";
 
 function fail(code: string, message: string): never {
   throw new ConvexError({ code, message });
@@ -700,13 +701,16 @@ function fail(code: string, message: string): never {
 
 function requireRef(value: string, name: string): void {
   if (value.length === 0 || value.length > MAX_REF_LENGTH) {
-    fail("INVALID_REF", `${name} must be 1..${MAX_REF_LENGTH} characters`);
+    fail(
+      "INVALID_REF",
+      `${name} must be 1..${String(MAX_REF_LENGTH)} characters`,
+    );
   }
 }
 
 function parseBatch(batch: number | undefined): number {
   const raw = batch ?? DEFAULT_ERASE_BATCH;
-  if (!Number.isInteger(raw)) {
+  if (!Number.isSafeInteger(raw)) {
     fail("INVALID_BATCH", "batch must be a positive integer");
   }
   if (raw < 1) {
@@ -721,19 +725,20 @@ export const open = mutation({
     capacity: v.optional(v.number()),
     scope: v.string(),
   },
-  returns: v.string(),
-  handler: async (ctx, args) => {
-    if (args.capacity !== undefined) {
-      if (!Number.isSafeInteger(args.capacity) || args.capacity < 1) {
-        fail("INVALID_CAPACITY", "capacity must be a positive integer");
-      }
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    if (
+      arguments_.capacity !== undefined &&
+      (!Number.isSafeInteger(arguments_.capacity) || arguments_.capacity < 1)
+    ) {
+      fail("INVALID_CAPACITY", "capacity must be a positive integer");
     }
-    const bucketRef = args.bucketRef ?? crypto.randomUUID();
+    const bucketRef = arguments_.bucketRef ?? crypto.randomUUID();
     requireRef(bucketRef, "bucketRef");
     const existing = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", bucketRef),
       )
       .unique();
     if (existing !== null) {
@@ -744,14 +749,15 @@ export const open = mutation({
     }
     await ctx.db.insert("buckets", {
       bucketRef,
-      capacity: args.capacity,
+      capacity: arguments_.capacity,
       memberCount: 0,
       openedAt: Date.now(),
-      scope: args.scope,
+      scope: arguments_.scope,
       status: "open",
     });
     return bucketRef;
   },
+  returns: v.string(),
 });
 
 export const join = mutation({
@@ -760,14 +766,14 @@ export const join = mutation({
     scope: v.string(),
     subjectRef: v.string(),
   },
-  returns: v.object({ joined: v.boolean(), reason: v.optional(v.string()) }),
-  handler: async (ctx, args) => {
-    requireRef(args.bucketRef, "bucketRef");
-    requireRef(args.subjectRef, "subjectRef");
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    requireRef(arguments_.bucketRef, "bucketRef");
+    requireRef(arguments_.subjectRef, "subjectRef");
     const bucket = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
       .unique();
     if (bucket === null) {
@@ -780,9 +786,9 @@ export const join = mutation({
       .query("members")
       .withIndex("by_bucket_subject", (q) =>
         q
-          .eq("scope", args.scope)
-          .eq("bucketRef", args.bucketRef)
-          .eq("subjectRef", args.subjectRef),
+          .eq("scope", arguments_.scope)
+          .eq("bucketRef", arguments_.bucketRef)
+          .eq("subjectRef", arguments_.subjectRef),
       )
       .unique();
     if (existing !== null) {
@@ -795,16 +801,17 @@ export const join = mutation({
       return { joined: false, reason: "full" };
     }
     await ctx.db.insert("members", {
-      bucketRef: args.bucketRef,
+      bucketRef: arguments_.bucketRef,
       joinedAt: Date.now(),
-      scope: args.scope,
-      subjectRef: args.subjectRef,
+      scope: arguments_.scope,
+      subjectRef: arguments_.subjectRef,
     });
     await ctx.db.patch("buckets", bucket._id, {
       memberCount: bucket.memberCount + 1,
     });
     return { joined: true };
   },
+  returns: v.object({ joined: v.boolean(), reason: v.optional(v.string()) }),
 });
 
 export const leave = mutation({
@@ -813,14 +820,14 @@ export const leave = mutation({
     scope: v.string(),
     subjectRef: v.string(),
   },
-  returns: v.boolean(),
-  handler: async (ctx, args) => {
-    requireRef(args.bucketRef, "bucketRef");
-    requireRef(args.subjectRef, "subjectRef");
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    requireRef(arguments_.bucketRef, "bucketRef");
+    requireRef(arguments_.subjectRef, "subjectRef");
     const bucket = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
       .unique();
     if (bucket === null || bucket.status === "closed") {
@@ -830,9 +837,9 @@ export const leave = mutation({
       .query("members")
       .withIndex("by_bucket_subject", (q) =>
         q
-          .eq("scope", args.scope)
-          .eq("bucketRef", args.bucketRef)
-          .eq("subjectRef", args.subjectRef),
+          .eq("scope", arguments_.scope)
+          .eq("bucketRef", arguments_.bucketRef)
+          .eq("subjectRef", arguments_.subjectRef),
       )
       .unique();
     if (existing === null) {
@@ -844,17 +851,18 @@ export const leave = mutation({
     });
     return true;
   },
+  returns: v.boolean(),
 });
 
 export const lock = mutation({
   args: { bucketRef: v.string(), scope: v.string() },
-  returns: v.boolean(),
-  handler: async (ctx, args) => {
-    requireRef(args.bucketRef, "bucketRef");
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    requireRef(arguments_.bucketRef, "bucketRef");
     const bucket = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
       .unique();
     if (bucket === null || bucket.status !== "open") {
@@ -866,17 +874,18 @@ export const lock = mutation({
     });
     return true;
   },
+  returns: v.boolean(),
 });
 
 export const close = mutation({
   args: { bucketRef: v.string(), scope: v.string() },
-  returns: v.boolean(),
-  handler: async (ctx, args) => {
-    requireRef(args.bucketRef, "bucketRef");
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    requireRef(arguments_.bucketRef, "bucketRef");
     const bucket = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
       .unique();
     if (bucket === null || bucket.status === "closed") {
@@ -888,6 +897,7 @@ export const close = mutation({
     });
     return true;
   },
+  returns: v.boolean(),
 });
 
 export const eraseBucket = mutation({
@@ -896,19 +906,20 @@ export const eraseBucket = mutation({
     bucketRef: v.string(),
     scope: v.string(),
   },
-  returns: v.number(),
-  handler: async (ctx, args) => {
-    requireRef(args.bucketRef, "bucketRef");
-    const batch = parseBatch(args.batch);
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    requireRef(arguments_.bucketRef, "bucketRef");
+    const batch = parseBatch(arguments_.batch);
     const bucket = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
       .unique();
     if (bucket === null) return 0;
     return eraseBucketBatch(ctx, bucket._id, batch);
   },
+  returns: v.number(),
 });
 
 async function eraseBucketBatch(
@@ -931,23 +942,23 @@ async function eraseBucketBatch(
     await ctx.db.delete("buckets", bucketId);
   } else {
     await ctx.db.patch("buckets", bucketId, {
-      status: "closed",
       closedAt: bucket.closedAt ?? Date.now(),
       memberCount: Math.max(0, bucket.memberCount - members.length),
+      status: "closed",
     });
     await ctx.scheduler.runAfter(0, internal.mutations.continueEraseBucket, {
-      bucketId,
       batch,
+      bucketId,
     });
   }
   return members.length;
 }
 
 export const continueEraseBucket = internalMutation({
-  args: { bucketId: v.id("buckets"), batch: v.number() },
+  args: { batch: v.number(), bucketId: v.id("buckets") },
+  handler: async (ctx, arguments_) =>
+    eraseBucketBatch(ctx, arguments_.bucketId, parseBatch(arguments_.batch)),
   returns: v.number(),
-  handler: async (ctx, args) =>
-    eraseBucketBatch(ctx, args.bucketId, parseBatch(args.batch)),
 });
 
 export const eraseSubject = mutation({
@@ -956,14 +967,14 @@ export const eraseSubject = mutation({
     scope: v.string(),
     subjectRef: v.string(),
   },
-  returns: v.number(),
-  handler: async (ctx, args) => {
-    requireRef(args.subjectRef, "subjectRef");
-    const batch = parseBatch(args.batch);
+  handler: async (ctx, arguments_) => {
+    requireRef(arguments_.scope, "scope");
+    requireRef(arguments_.subjectRef, "subjectRef");
+    const batch = parseBatch(arguments_.batch);
     const memberships = await ctx.db
       .query("members")
       .withIndex("by_subject", (q) =>
-        q.eq("scope", args.scope).eq("subjectRef", args.subjectRef),
+        q.eq("scope", arguments_.scope).eq("subjectRef", arguments_.subjectRef),
       )
       .take(batch);
     await Promise.all(
@@ -987,12 +998,13 @@ export const eraseSubject = mutation({
     if (memberships.length === batch) {
       await ctx.scheduler.runAfter(0, api.mutations.eraseSubject, {
         batch,
-        scope: args.scope,
-        subjectRef: args.subjectRef,
+        scope: arguments_.scope,
+        subjectRef: arguments_.subjectRef,
       });
     }
     return memberships.length;
   },
+  returns: v.number(),
 });
 
 ```
@@ -1004,8 +1016,10 @@ export const eraseSubject = mutation({
 ```ts
 import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
+
+import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, MAX_REF_LENGTH } from "../shared";
+
 import { query } from "./_generated/server";
-import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "../shared";
 import { bucketState, memberState } from "./validators";
 
 function fail(code: string, message: string): never {
@@ -1014,12 +1028,15 @@ function fail(code: string, message: string): never {
 
 export const get = query({
   args: { bucketRef: v.string(), scope: v.string() },
-  returns: v.union(v.null(), bucketState),
-  handler: async (ctx, args) => {
+  handler: async (ctx, arguments_) => {
+    [arguments_.scope, arguments_.bucketRef].forEach((value) => {
+      if (value.length === 0 || value.length > MAX_REF_LENGTH)
+        fail("INVALID_REF", "refs must be 1..256 characters");
+    });
     const bucket = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
       .unique();
     if (bucket === null) {
@@ -1035,39 +1052,44 @@ export const get = query({
       status: bucket.status,
     };
   },
+  returns: v.union(v.null(), bucketState),
 });
 
 export const paginateMembers = query({
   args: {
     bucketRef: v.string(),
-    scope: v.string(),
     paginationOpts: paginationOptsValidator,
+    scope: v.string(),
   },
-  returns: v.object({
-    page: v.array(memberState),
-    isDone: v.boolean(),
-    continueCursor: v.string(),
-  }),
-  handler: async (ctx, args) => {
-    const size = args.paginationOpts.numItems;
+  handler: async (ctx, arguments_) => {
+    [arguments_.scope, arguments_.bucketRef].forEach((value) => {
+      if (value.length === 0 || value.length > MAX_REF_LENGTH)
+        fail("INVALID_REF", "refs must be 1..256 characters");
+    });
+    const size = arguments_.paginationOpts.numItems;
     if (!Number.isSafeInteger(size) || size < 1 || size > MAX_LIST_LIMIT) {
-      fail("INVALID_LIMIT", `numItems must be 1..${MAX_LIST_LIMIT}`);
+      fail("INVALID_LIMIT", `numItems must be 1..${String(MAX_LIST_LIMIT)}`);
     }
     const result = await ctx.db
       .query("members")
       .withIndex("by_bucket", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
-      .paginate(args.paginationOpts);
+      .paginate(arguments_.paginationOpts);
     return {
+      continueCursor: result.continueCursor,
+      isDone: result.isDone,
       page: result.page.map((member) => ({
         joinedAt: member.joinedAt,
         subjectRef: member.subjectRef,
       })),
-      isDone: result.isDone,
-      continueCursor: result.continueCursor,
     };
   },
+  returns: v.object({
+    continueCursor: v.string(),
+    isDone: v.boolean(),
+    page: v.array(memberState),
+  }),
 });
 
 /** Bounded preview; use paginateMembers to enumerate a bucket. */
@@ -1077,10 +1099,13 @@ export const listMembers = query({
     limit: v.optional(v.number()),
     scope: v.string(),
   },
-  returns: v.array(memberState),
-  handler: async (ctx, args) => {
-    const raw = args.limit ?? DEFAULT_LIST_LIMIT;
-    if (!Number.isInteger(raw)) {
+  handler: async (ctx, arguments_) => {
+    [arguments_.scope, arguments_.bucketRef].forEach((value) => {
+      if (value.length === 0 || value.length > MAX_REF_LENGTH)
+        fail("INVALID_REF", "refs must be 1..256 characters");
+    });
+    const raw = arguments_.limit ?? DEFAULT_LIST_LIMIT;
+    if (!Number.isSafeInteger(raw)) {
       fail("INVALID_LIMIT", "limit must be a positive integer");
     }
     if (raw < 1) {
@@ -1090,7 +1115,7 @@ export const listMembers = query({
     const members = await ctx.db
       .query("members")
       .withIndex("by_bucket", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+        q.eq("scope", arguments_.scope).eq("bucketRef", arguments_.bucketRef),
       )
       .take(limit);
     return members.map((member) => ({
@@ -1098,6 +1123,7 @@ export const listMembers = query({
       subjectRef: member.subjectRef,
     }));
   },
+  returns: v.array(memberState),
 });
 
 ```
@@ -1108,6 +1134,7 @@ export const listMembers = query({
 
 ```ts
 import type { TestConvex } from "convex-test";
+
 import schema from "./component/schema";
 
 const modules = import.meta.glob("./component/**/*.ts");

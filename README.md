@@ -114,10 +114,10 @@ pnpm test:coverage
 ```
 
 Unit tests use the simulated `convex-test` runtime (`@edge-runtime/vm`), not a
-real backend. `example/convex/runtimeCheck.ts` additionally checks concurrent
+real backend. `example/convex/actions.ts` additionally checks concurrent
 capacity admission and scheduled cleanup on a real local Convex backend. Run
 with an isolated HOME and
-`CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --local-cloud-port 3330 --local-site-port 3331 --run runtimeCheck:verify`.
+`CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --local-cloud-port 3330 --local-site-port 3331 --run actions:verify`.
 This is targeted evidence, not proof of every concurrency interleaving.
 
 ## Cleanup and isolation

@@ -23,9 +23,9 @@ org/roles) and `@convex-dev/presence` (liveness).
 
 ## Examples
 
-- [Example component wrapper](example/convex/example.ts): Host-app wrapper functions
+- [Example component wrapper](example/convex/mutations.ts): Host-app wrapper functions
 - [Example tests](example/convex/example.test.ts): Simulated usage coverage with `convex-test`
-- [Local runtime check](example/convex/runtimeCheck.ts): Actual local backend concurrent admission and scheduler check
+- [Local runtime check](example/convex/actions.ts): Actual local backend concurrent admission and scheduler check
 
 ## Optional
 

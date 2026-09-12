@@ -1,14 +1,16 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import { api } from "./_generated/api";
-import schema from "./schema";
-import { register } from "../../src/test";
+
 import {
   clampEraseBatch,
   clampListLimit,
   MAX_ERASE_BATCH,
   MAX_LIST_LIMIT,
 } from "../../src/shared";
+import { register } from "../../src/test";
+
+import { api } from "./_generated/api";
+import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -21,52 +23,52 @@ function setup() {
 describe("buckets — lifecycle", () => {
   test("open generates a ref and join/list/get work", async () => {
     const t = setup();
-    const ref = await t.mutation(api.example.open, { capacity: 2 });
+    const ref = await t.mutation(api.mutations.open, { capacity: 2 });
     expect(ref.length).toBeGreaterThan(0);
     expect(
-      await t.mutation(api.example.join, { bucketRef: ref, subjectRef: "a" }),
+      await t.mutation(api.mutations.join, { bucketRef: ref, subjectRef: "a" }),
     ).toEqual({ joined: true });
     expect(
-      await t.mutation(api.example.join, { bucketRef: ref, subjectRef: "b" }),
+      await t.mutation(api.mutations.join, { bucketRef: ref, subjectRef: "b" }),
     ).toEqual({ joined: true });
-    const state = await t.query(api.example.get, { bucketRef: ref });
+    const state = await t.query(api.queries.get, { bucketRef: ref });
     expect(state).toMatchObject({
-      status: "open",
-      memberCount: 2,
       capacity: 2,
+      memberCount: 2,
+      status: "open",
     });
-    const page = await t.query(api.example.paginateMembers, {
+    const page = await t.query(api.queries.paginateMembers, {
       bucketRef: ref,
       paginationOpts: { cursor: null, numItems: 1 },
     });
     expect(page.page).toHaveLength(1);
     expect(page.isDone).toBe(false);
-    const members = await t.query(api.example.listMembers, { bucketRef: ref });
+    const members = await t.query(api.queries.listMembers, { bucketRef: ref });
     expect(members.map((m) => m.subjectRef).sort()).toEqual(["a", "b"]);
   });
 
   test("named open cannot collide", async () => {
     const t = setup();
-    await t.mutation(api.example.open, { bucketRef: "match-1" });
+    await t.mutation(api.mutations.open, { bucketRef: "match-1" });
     await expect(
-      t.mutation(api.example.open, { bucketRef: "match-1" }),
+      t.mutation(api.mutations.open, { bucketRef: "match-1" }),
     ).rejects.toThrow();
   });
 
   test("full / already_member / missing join reasons", async () => {
     const t = setup();
-    await t.mutation(api.example.open, { bucketRef: "m", capacity: 1 });
+    await t.mutation(api.mutations.open, { bucketRef: "m", capacity: 1 });
     expect(
-      await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "a" }),
+      await t.mutation(api.mutations.join, { bucketRef: "m", subjectRef: "a" }),
     ).toEqual({ joined: true });
     expect(
-      await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "a" }),
+      await t.mutation(api.mutations.join, { bucketRef: "m", subjectRef: "a" }),
     ).toEqual({ joined: false, reason: "already_member" });
     expect(
-      await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "b" }),
+      await t.mutation(api.mutations.join, { bucketRef: "m", subjectRef: "b" }),
     ).toEqual({ joined: false, reason: "full" });
     expect(
-      await t.mutation(api.example.join, {
+      await t.mutation(api.mutations.join, {
         bucketRef: "nope",
         subjectRef: "a",
       }),
@@ -75,102 +77,119 @@ describe("buckets — lifecycle", () => {
 
   test("lock then close", async () => {
     const t = setup();
-    await t.mutation(api.example.open, { bucketRef: "m" });
-    await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "a" });
-    expect(await t.mutation(api.example.lock, { bucketRef: "m" })).toBe(true);
+    await t.mutation(api.mutations.open, { bucketRef: "m" });
+    await t.mutation(api.mutations.join, { bucketRef: "m", subjectRef: "a" });
+    expect(await t.mutation(api.mutations.lock, { bucketRef: "m" })).toBe(true);
     expect(
-      await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "b" }),
+      await t.mutation(api.mutations.join, { bucketRef: "m", subjectRef: "b" }),
     ).toEqual({ joined: false, reason: "locked" });
     expect(
-      await t.mutation(api.example.leave, { bucketRef: "m", subjectRef: "a" }),
+      await t.mutation(api.mutations.leave, {
+        bucketRef: "m",
+        subjectRef: "a",
+      }),
     ).toBe(true);
-    expect(await t.mutation(api.example.lock, { bucketRef: "m" })).toBe(false);
-    expect(await t.mutation(api.example.close, { bucketRef: "m" })).toBe(true);
+    expect(await t.mutation(api.mutations.lock, { bucketRef: "m" })).toBe(
+      false,
+    );
+    expect(await t.mutation(api.mutations.close, { bucketRef: "m" })).toBe(
+      true,
+    );
     expect(
-      await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "c" }),
+      await t.mutation(api.mutations.join, { bucketRef: "m", subjectRef: "c" }),
     ).toEqual({ joined: false, reason: "closed" });
     expect(
-      await t.mutation(api.example.leave, { bucketRef: "m", subjectRef: "a" }),
+      await t.mutation(api.mutations.leave, {
+        bucketRef: "m",
+        subjectRef: "a",
+      }),
     ).toBe(false);
-    expect(await t.mutation(api.example.close, { bucketRef: "m" })).toBe(false);
+    expect(await t.mutation(api.mutations.close, { bucketRef: "m" })).toBe(
+      false,
+    );
   });
 
   test("close from open, leave missing, get missing", async () => {
     const t = setup();
-    await t.mutation(api.example.open, { bucketRef: "m" });
-    expect(await t.mutation(api.example.close, { bucketRef: "m" })).toBe(true);
+    await t.mutation(api.mutations.open, { bucketRef: "m" });
+    expect(await t.mutation(api.mutations.close, { bucketRef: "m" })).toBe(
+      true,
+    );
     expect(
-      await t.mutation(api.example.leave, {
+      await t.mutation(api.mutations.leave, {
         bucketRef: "missing",
         subjectRef: "a",
       }),
     ).toBe(false);
     expect(
-      await t.mutation(api.example.leave, {
+      await t.mutation(api.mutations.leave, {
         bucketRef: "m",
         subjectRef: "ghost",
       }),
     ).toBe(false);
-    expect(await t.query(api.example.get, { bucketRef: "nope" })).toBeNull();
-    expect(await t.mutation(api.example.lock, { bucketRef: "nope" })).toBe(
+    expect(await t.query(api.queries.get, { bucketRef: "nope" })).toBeNull();
+    expect(await t.mutation(api.mutations.lock, { bucketRef: "nope" })).toBe(
       false,
     );
-    expect(await t.mutation(api.example.close, { bucketRef: "nope" })).toBe(
+    expect(await t.mutation(api.mutations.close, { bucketRef: "nope" })).toBe(
       false,
     );
   });
 
   test("eraseBucket batches members", async () => {
     const t = setup();
-    await t.mutation(api.example.open, { bucketRef: "m", capacity: 4 });
-    await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "a" });
-    await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "b" });
+    await t.mutation(api.mutations.open, { bucketRef: "m", capacity: 4 });
+    await t.mutation(api.mutations.join, { bucketRef: "m", subjectRef: "a" });
+    await t.mutation(api.mutations.join, { bucketRef: "m", subjectRef: "b" });
     expect(
-      await t.mutation(api.example.eraseBucket, { bucketRef: "m", batch: 1 }),
+      await t.mutation(api.mutations.eraseBucket, { batch: 1, bucketRef: "m" }),
     ).toBe(1);
-    expect(await t.mutation(api.example.eraseBucket, { bucketRef: "m" })).toBe(
-      1,
-    );
+    expect(
+      await t.mutation(api.mutations.eraseBucket, { bucketRef: "m" }),
+    ).toBe(1);
   });
 
   test("eraseBucket and eraseSubject", async () => {
     const t = setup();
-    await t.mutation(api.example.open, { bucketRef: "m" });
-    await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "a" });
+    await t.mutation(api.mutations.open, { bucketRef: "m" });
+    await t.mutation(api.mutations.join, { bucketRef: "m", subjectRef: "a" });
     expect(
-      await t.mutation(api.example.eraseSubject, { subjectRef: "a" }),
+      await t.mutation(api.mutations.eraseSubject, { subjectRef: "a" }),
     ).toBe(1);
-    expect(await t.query(api.example.listMembers, { bucketRef: "m" })).toEqual(
+    expect(await t.query(api.queries.listMembers, { bucketRef: "m" })).toEqual(
       [],
     );
-    expect(await t.mutation(api.example.eraseBucket, { bucketRef: "m" })).toBe(
-      0,
-    );
-    expect(await t.query(api.example.get, { bucketRef: "m" })).toBeNull();
-    expect(await t.mutation(api.example.eraseBucket, { bucketRef: "m" })).toBe(
-      0,
-    );
+    expect(
+      await t.mutation(api.mutations.eraseBucket, { bucketRef: "m" }),
+    ).toBe(0);
+    expect(await t.query(api.queries.get, { bucketRef: "m" })).toBeNull();
+    expect(
+      await t.mutation(api.mutations.eraseBucket, { bucketRef: "m" }),
+    ).toBe(0);
   });
 
   test("eraseSubject batches memberships", async () => {
     const t = setup();
-    await t.mutation(api.example.open, { bucketRef: "m1" });
-    await t.mutation(api.example.open, { bucketRef: "m2" });
-    await t.mutation(api.example.join, { bucketRef: "m1", subjectRef: "a" });
-    await t.mutation(api.example.join, { bucketRef: "m2", subjectRef: "a" });
+    await t.mutation(api.mutations.open, { bucketRef: "m1" });
+    await t.mutation(api.mutations.open, { bucketRef: "m2" });
+    await t.mutation(api.mutations.join, { bucketRef: "m1", subjectRef: "a" });
+    await t.mutation(api.mutations.join, { bucketRef: "m2", subjectRef: "a" });
     expect(
-      await t.mutation(api.example.eraseSubject, { subjectRef: "a", batch: 1 }),
+      await t.mutation(api.mutations.eraseSubject, {
+        batch: 1,
+        subjectRef: "a",
+      }),
     ).toBe(1);
     expect(
-      await t.mutation(api.example.eraseSubject, { subjectRef: "a" }),
+      await t.mutation(api.mutations.eraseSubject, { subjectRef: "a" }),
     ).toBe(1);
   });
 
   test("leave unknown member on an open bucket", async () => {
     const t = setup();
-    await t.mutation(api.example.open, { bucketRef: "m" });
+    await t.mutation(api.mutations.open, { bucketRef: "m" });
     expect(
-      await t.mutation(api.example.leave, {
+      await t.mutation(api.mutations.leave, {
         bucketRef: "m",
         subjectRef: "ghost",
       }),
@@ -179,12 +198,12 @@ describe("buckets — lifecycle", () => {
 
   test("eraseBucket deletes members", async () => {
     const t = setup();
-    await t.mutation(api.example.open, { bucketRef: "m" });
-    await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "a" });
-    expect(await t.mutation(api.example.eraseBucket, { bucketRef: "m" })).toBe(
-      1,
-    );
-    expect(await t.query(api.example.get, { bucketRef: "m" })).toBeNull();
+    await t.mutation(api.mutations.open, { bucketRef: "m" });
+    await t.mutation(api.mutations.join, { bucketRef: "m", subjectRef: "a" });
+    expect(
+      await t.mutation(api.mutations.eraseBucket, { bucketRef: "m" }),
+    ).toBe(1);
+    expect(await t.query(api.queries.get, { bucketRef: "m" })).toBeNull();
   });
 });
 
@@ -192,53 +211,53 @@ describe("buckets — validation and scope", () => {
   test("rejects empty refs and bad capacity", async () => {
     const t = setup();
     await expect(
-      t.mutation(api.example.open, { bucketRef: "", capacity: 1 }),
+      t.mutation(api.mutations.open, { bucketRef: "", capacity: 1 }),
     ).rejects.toThrow();
     await expect(
-      t.mutation(api.example.open, { capacity: 0 }),
+      t.mutation(api.mutations.open, { capacity: 0 }),
     ).rejects.toThrow();
     await expect(
-      t.mutation(api.example.join, { bucketRef: "", subjectRef: "a" }),
+      t.mutation(api.mutations.join, { bucketRef: "", subjectRef: "a" }),
     ).rejects.toThrow();
     await expect(
-      t.mutation(api.example.join, { bucketRef: "m", subjectRef: "" }),
+      t.mutation(api.mutations.join, { bucketRef: "m", subjectRef: "" }),
     ).rejects.toThrow();
     await expect(
-      t.mutation(api.example.leave, { bucketRef: "", subjectRef: "a" }),
+      t.mutation(api.mutations.leave, { bucketRef: "", subjectRef: "a" }),
     ).rejects.toThrow();
     await expect(
-      t.mutation(api.example.leave, { bucketRef: "m", subjectRef: "" }),
+      t.mutation(api.mutations.leave, { bucketRef: "m", subjectRef: "" }),
     ).rejects.toThrow();
     await expect(
-      t.mutation(api.example.lock, { bucketRef: "" }),
+      t.mutation(api.mutations.lock, { bucketRef: "" }),
     ).rejects.toThrow();
     await expect(
-      t.mutation(api.example.close, { bucketRef: "" }),
+      t.mutation(api.mutations.close, { bucketRef: "" }),
     ).rejects.toThrow();
     await expect(
-      t.mutation(api.example.eraseBucket, { bucketRef: "" }),
+      t.mutation(api.mutations.eraseBucket, { bucketRef: "" }),
     ).rejects.toThrow();
     await expect(
-      t.mutation(api.example.eraseSubject, { subjectRef: "" }),
+      t.mutation(api.mutations.eraseSubject, { subjectRef: "" }),
     ).rejects.toThrow();
     await expect(
-      t.mutation(api.example.eraseSubject, { subjectRef: "a", batch: 0 }),
+      t.mutation(api.mutations.eraseSubject, { batch: 0, subjectRef: "a" }),
     ).rejects.toThrow();
     await expect(
-      t.mutation(api.example.eraseSubject, { subjectRef: "a", batch: 1.5 }),
+      t.mutation(api.mutations.eraseSubject, { batch: 1.5, subjectRef: "a" }),
     ).rejects.toThrow();
     await expect(
-      t.query(api.example.listMembers, { bucketRef: "m", limit: 0 }),
+      t.query(api.queries.listMembers, { bucketRef: "m", limit: 0 }),
     ).rejects.toThrow();
     await expect(
-      t.query(api.example.listMembers, { bucketRef: "m", limit: 1.5 }),
+      t.query(api.queries.listMembers, { bucketRef: "m", limit: 1.5 }),
     ).rejects.toThrow();
   });
 
   test("tenant scope is isolated", async () => {
     const t = setup();
-    await t.mutation(api.example.openTenant, { bucketRef: "m" });
-    expect(await t.query(api.example.get, { bucketRef: "m" })).toBeNull();
+    await t.mutation(api.mutations.openTenant, { bucketRef: "m" });
+    expect(await t.query(api.queries.get, { bucketRef: "m" })).toBeNull();
   });
 });
 

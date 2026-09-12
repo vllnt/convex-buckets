@@ -17,7 +17,11 @@ export default defineSchema({
     memberCount: v.number(),
     openedAt: v.number(),
     scope: v.string(),
-    status: v.union(v.literal("closed"), v.literal("locked"), v.literal("open")),
+    status: v.union(
+      v.literal("closed"),
+      v.literal("locked"),
+      v.literal("open"),
+    ),
   }).index("by_scope_ref", ["scope", "bucketRef"]),
   members: defineTable({
     bucketRef: v.string(),

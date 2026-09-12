@@ -1,7 +1,8 @@
 import { convexTest } from "convex-test";
 import { expect, test, vi } from "vitest";
-import schema from "../../src/component/schema";
+
 import { api, internal } from "../../src/component/_generated/api";
+import schema from "../../src/component/schema";
 
 const modules = import.meta.glob("../../src/component/**/*.ts");
 
@@ -9,7 +10,7 @@ test("bucket cleanup closes immediately, counts remaining rows, and fences stale
   vi.useFakeTimers();
   try {
     const t = convexTest(schema, modules);
-    const ref = { scope: "s", bucketRef: "b" };
+    const ref = { bucketRef: "b", scope: "s" };
     await t.mutation(api.mutations.open, ref);
     const id = await t.run(
       async (ctx) => (await ctx.db.query("buckets").unique())!._id,
@@ -20,8 +21,8 @@ test("bucket cleanup closes immediately, counts remaining rows, and fences stale
       await t.mutation(api.mutations.eraseBucket, { ...ref, batch: 1 }),
     ).toBe(1);
     expect(await t.query(api.queries.get, ref)).toMatchObject({
-      status: "closed",
       memberCount: 2,
+      status: "closed",
     });
     expect(
       await t.mutation(api.mutations.join, { ...ref, subjectRef: "d" }),
@@ -32,14 +33,14 @@ test("bucket cleanup closes immediately, counts remaining rows, and fences stale
     await t.mutation(api.mutations.join, { ...ref, subjectRef: "new" });
     expect(
       await t.mutation(internal.mutations.continueEraseBucket, {
-        bucketId: id,
         batch: 1,
+        bucketId: id,
       }),
     ).toBe(0);
     await t.finishAllScheduledFunctions(vi.runAllTimers);
     expect(await t.query(api.queries.get, ref)).toMatchObject({
-      status: "open",
       memberCount: 1,
+      status: "open",
     });
   } finally {
     vi.useRealTimers();
@@ -50,10 +51,10 @@ test("subject cleanup tolerates orphan rows", async () => {
   const t = convexTest(schema, modules);
   await t.run(async (ctx) => {
     await ctx.db.insert("members", {
-      scope: "s",
       bucketRef: "orphan",
-      subjectRef: "a",
       joinedAt: 0,
+      scope: "s",
+      subjectRef: "a",
     });
   });
   expect(
@@ -66,7 +67,7 @@ test("subject cleanup tolerates orphan rows", async () => {
 
 test("pagination traverses every member and validates page sizes", async () => {
   const t = convexTest(schema, modules);
-  const ref = { scope: "s", bucketRef: "b" };
+  const ref = { bucketRef: "b", scope: "s" };
   await t.mutation(api.mutations.open, ref);
   for (const subjectRef of ["a", "b", "c"])
     await t.mutation(api.mutations.join, { ...ref, subjectRef });
@@ -85,17 +86,17 @@ test("pagination traverses every member and validates page sizes", async () => {
     "b",
     "c",
   ]);
-  for (const numItems of [0, 1.5, 501])
+  for (const numberItems of [0, 1.5, 501])
     await expect(
       t.query(api.queries.paginateMembers, {
         ...ref,
-        paginationOpts: { cursor: null, numItems },
+        paginationOpts: { cursor: null, numItems: numberItems },
       }),
     ).rejects.toThrow("INVALID_LIMIT");
   await expect(
     t.mutation(api.mutations.open, {
-      scope: "s",
       capacity: Number.MAX_SAFE_INTEGER + 1,
+      scope: "s",
     }),
   ).rejects.toThrow("INVALID_CAPACITY");
 });

@@ -1,4 +1,5 @@
 import type { TestConvex } from "convex-test";
+
 import schema from "./component/schema";
 
 const modules = import.meta.glob("./component/**/*.ts");

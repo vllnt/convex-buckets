@@ -5,50 +5,23 @@ import type {
   PaginationOptions,
   PaginationResult,
 } from "convex/server";
+
+import { DEFAULT_SCOPE } from "../shared.js";
+
 import type {
-  BucketState,
-  BucketStatus,
   BucketsOptions,
+  BucketState,
   JoinResult,
   MemberState,
   OpenOptions,
 } from "./types.js";
-import {
-  DEFAULT_ERASE_BATCH,
-  DEFAULT_LIST_LIMIT,
-  DEFAULT_SCOPE,
-} from "../shared.js";
 
-export interface BucketsComponent {
+export type BucketsComponent = {
   mutations: {
-    open: FunctionReference<
-      "mutation",
-      "internal",
-      { scope: string; bucketRef?: string; capacity?: number },
-      string
-    >;
-    join: FunctionReference<
-      "mutation",
-      "internal",
-      { scope: string; bucketRef: string; subjectRef: string },
-      JoinResult
-    >;
-    leave: FunctionReference<
-      "mutation",
-      "internal",
-      { scope: string; bucketRef: string; subjectRef: string },
-      boolean
-    >;
-    lock: FunctionReference<
-      "mutation",
-      "internal",
-      { scope: string; bucketRef: string },
-      boolean
-    >;
     close: FunctionReference<
       "mutation",
       "internal",
-      { scope: string; bucketRef: string },
+      { bucketRef: string; scope: string },
       boolean
     >;
     eraseBucket: FunctionReference<
@@ -63,18 +36,36 @@ export interface BucketsComponent {
       { batch?: number; scope: string; subjectRef: string },
       number
     >;
+    join: FunctionReference<
+      "mutation",
+      "internal",
+      { bucketRef: string; scope: string; subjectRef: string },
+      JoinResult
+    >;
+    leave: FunctionReference<
+      "mutation",
+      "internal",
+      { bucketRef: string; scope: string; subjectRef: string },
+      boolean
+    >;
+    lock: FunctionReference<
+      "mutation",
+      "internal",
+      { bucketRef: string; scope: string },
+      boolean
+    >;
+    open: FunctionReference<
+      "mutation",
+      "internal",
+      { bucketRef?: string; capacity?: number; scope: string },
+      string
+    >;
   };
   queries: {
-    paginateMembers: FunctionReference<
-      "query",
-      "internal",
-      { bucketRef: string; scope: string; paginationOpts: PaginationOptions },
-      PaginationResult<MemberState>
-    >;
     get: FunctionReference<
       "query",
       "internal",
-      { scope: string; bucketRef: string },
+      { bucketRef: string; scope: string },
       BucketState | null
     >;
     listMembers: FunctionReference<
@@ -83,22 +74,28 @@ export interface BucketsComponent {
       { bucketRef: string; limit?: number; scope: string },
       MemberState[]
     >;
+    paginateMembers: FunctionReference<
+      "query",
+      "internal",
+      { bucketRef: string; paginationOpts: PaginationOptions; scope: string },
+      PaginationResult<MemberState>
+    >;
   };
-}
+};
 
-interface RunQueryCtx {
-  runQuery<Q extends FunctionReference<"query", "internal">>(
-    reference: Q,
-    args: FunctionArgs<Q>,
-  ): Promise<FunctionReturnType<Q>>;
-}
+type RunQueryCtx = {
+  runQuery<TQuery extends FunctionReference<"query", "internal">>(
+    reference: TQuery,
+    arguments_: FunctionArgs<TQuery>,
+  ): Promise<FunctionReturnType<TQuery>>;
+};
 
-interface RunMutationCtx {
-  runMutation<M extends FunctionReference<"mutation", "internal">>(
-    reference: M,
-    args: FunctionArgs<M>,
-  ): Promise<FunctionReturnType<M>>;
-}
+type RunMutationCtx = {
+  runMutation<TMutation extends FunctionReference<"mutation", "internal">>(
+    reference: TMutation,
+    arguments_: FunctionArgs<TMutation>,
+  ): Promise<FunctionReturnType<TMutation>>;
+};
 
 export class Buckets {
   private readonly defaultScope: string;
@@ -114,11 +111,11 @@ export class Buckets {
     return scope ?? this.defaultScope;
   }
 
-  open(ctx: RunMutationCtx, opts: OpenOptions = {}): Promise<string> {
+  open(ctx: RunMutationCtx, options: OpenOptions = {}): Promise<string> {
     return ctx.runMutation(this.component.mutations.open, {
-      scope: this.scopeOf(opts.scope),
-      bucketRef: opts.bucketRef,
-      capacity: opts.capacity,
+      bucketRef: options.bucketRef,
+      capacity: options.capacity,
+      scope: this.scopeOf(options.scope),
     });
   }
 
@@ -129,8 +126,8 @@ export class Buckets {
     scope?: string,
   ): Promise<JoinResult> {
     return ctx.runMutation(this.component.mutations.join, {
-      scope: this.scopeOf(scope),
       bucketRef,
+      scope: this.scopeOf(scope),
       subjectRef,
     });
   }
@@ -142,8 +139,8 @@ export class Buckets {
     scope?: string,
   ): Promise<boolean> {
     return ctx.runMutation(this.component.mutations.leave, {
-      scope: this.scopeOf(scope),
       bucketRef,
+      scope: this.scopeOf(scope),
       subjectRef,
     });
   }
@@ -154,8 +151,8 @@ export class Buckets {
     scope?: string,
   ): Promise<boolean> {
     return ctx.runMutation(this.component.mutations.lock, {
-      scope: this.scopeOf(scope),
       bucketRef,
+      scope: this.scopeOf(scope),
     });
   }
 
@@ -165,8 +162,8 @@ export class Buckets {
     scope?: string,
   ): Promise<boolean> {
     return ctx.runMutation(this.component.mutations.close, {
-      scope: this.scopeOf(scope),
       bucketRef,
+      scope: this.scopeOf(scope),
     });
   }
 
@@ -176,20 +173,20 @@ export class Buckets {
     scope?: string,
   ): Promise<BucketState | null> {
     return ctx.runQuery(this.component.queries.get, {
-      scope: this.scopeOf(scope),
       bucketRef,
+      scope: this.scopeOf(scope),
     });
   }
 
   paginateMembers(
     ctx: RunQueryCtx,
     bucketRef: string,
-    paginationOpts: PaginationOptions,
+    paginationOptions: PaginationOptions,
     scope?: string,
   ): Promise<PaginationResult<MemberState>> {
     return ctx.runQuery(this.component.queries.paginateMembers, {
       bucketRef,
-      paginationOpts,
+      paginationOpts: paginationOptions,
       scope: this.scopeOf(scope),
     });
   }
@@ -234,11 +231,11 @@ export class Buckets {
   }
 }
 
-export type {
-  BucketState,
-  BucketStatus,
-  BucketsOptions,
-  JoinResult,
-  MemberState,
-  OpenOptions,
-};
+export {
+  type BucketsOptions,
+  type BucketState,
+  type BucketStatus,
+  type JoinResult,
+  type MemberState,
+  type OpenOptions,
+} from "./types.js";
