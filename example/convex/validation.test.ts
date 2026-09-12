@@ -1,5 +1,5 @@
 import { convexTest } from "convex-test";
-import { expect, test, vi } from "vitest";
+import { expect, test } from "vitest";
 
 import { api } from "../../src/component/_generated/api";
 import schema from "../../src/component/schema";
@@ -29,32 +29,28 @@ test.each(["", "x".repeat(257)])(
   },
 );
 
-test("subject snapshot preserves same-clock recreation across queued jobs", async () => {
-  vi.useFakeTimers();
-  try {
-    const t = convexTest(schema, modules);
-    const ref = { bucketRef: "b", scope: "s" };
-    await t.mutation(api.mutations.open, ref);
-    await t.mutation(api.mutations.join, { ...ref, subjectRef: "a" });
+test("subject batches leave no scheduled work that could erase recreation", async () => {
+  const t = convexTest(schema, modules);
+  const ref = { bucketRef: "b", scope: "s" };
+  await t.mutation(api.mutations.open, ref);
+  await t.mutation(api.mutations.join, { ...ref, subjectRef: "a" });
+  expect(
     await t.mutation(api.mutations.eraseSubject, {
       batch: 1,
       scope: "s",
       subjectRef: "a",
-    });
-    expect(
-      await t.mutation(api.mutations.eraseSubject, {
-        scope: "s",
-        subjectRef: "a",
-      }),
-    ).toBe(0);
-    await t.mutation(api.mutations.join, { ...ref, subjectRef: "a" });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
-    const erased = await t.query(api.queries.get, ref);
-    expect(erased?.memberCount).toBe(1);
-    await t.mutation(api.mutations.join, { ...ref, subjectRef: "a" });
-    const recreated = await t.query(api.queries.get, ref);
-    expect(recreated?.memberCount).toBe(1);
-  } finally {
-    vi.useRealTimers();
-  }
+    }),
+  ).toBe(1);
+  expect(
+    await t.mutation(api.mutations.eraseSubject, {
+      scope: "s",
+      subjectRef: "a",
+    }),
+  ).toBe(0);
+  expect(
+    await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()),
+  ).toEqual([]);
+  await t.mutation(api.mutations.join, { ...ref, subjectRef: "a" });
+  const recreated = await t.query(api.queries.get, ref);
+  expect(recreated?.memberCount).toBe(1);
 });

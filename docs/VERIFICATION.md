@@ -21,7 +21,12 @@ Pin `--local-backend-version precompiled-2026-09-11-157eb19` to avoid a version 
 ## Remaining limitations / review requirements
 
 - Package AGENTS now links official component authoring guidance; the absent generated guidance link was removed without fabricating generated files.
-- `eraseSubject` is snapshot-bounded by the newest matching `_creationTime`; later joins survive pending continuations. It is not a permanent ban. A real-backend fixture recreates membership in the same transaction after a zero-return call while the original continuation remains queued.
+- `eraseSubject` is caller-driven: one bounded batch and no scheduled continuation.
+  Unit tests assert an empty scheduler after exact-batch erasure; the real-backend
+  fixture drains and rejoins in one transaction. No fixed sleep is used as proof
+  of subject-job execution. `_creationTime` is not assumed unique or monotonic:
+  [Convex guidance](https://discord-questions.convex.dev/m/1273715538555699261).
+  This replaces the unpublished automatic subject-sweep contract.
 - Scope, bucket and subject refs are bounded to 1..256 characters in reads and writes; capacity, batch sizes and list sizes reject unsafe integers.
 - The actual runtime check now mounts a second independent instance, inserts the same bucket ref, and verifies first-mount cleanup leaves the second mount intact.
 - Node 20.19.0 was verified with `pnpm dlx node@20.19.0 node_modules/vitest/vitest.mjs run --coverage`: 26 tests passed, 100% across all four coverage metrics. The actual backend CLI run used Node 26.

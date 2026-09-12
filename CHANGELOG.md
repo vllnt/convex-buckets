@@ -18,6 +18,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   by document ID.
 - Safely remove orphan subject memberships; reject unsafe integer capacities.
 
+### Changed
+
+- `eraseSubject` now deletes one caller-driven batch, without scheduling future
+  sweeps. Drain under a host write fence until zero; no timestamp-ordering
+  assumption or latent subject job can affect subsequent rejoining.
+
 ### Preview surface
 
 - `open`, `join`, `leave`, `lock`, `close`, `get`, `listMembers` (bounded),

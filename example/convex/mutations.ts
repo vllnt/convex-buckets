@@ -87,16 +87,17 @@ export const openTenant = mutation({
   returns: v.string(),
 });
 
-/** Recreate in the same transaction while the first snapshot still has a queued job. */
-export const snapshotFixture = mutation({
+/** Caller-driven erasure completes without scheduling later subject sweeps. */
+export const subjectEraseFixture = mutation({
   args: { bucketRef: v.string() },
   handler: async (ctx, { bucketRef }) => {
     await buckets.open(ctx, { bucketRef });
-    await buckets.join(ctx, bucketRef, "snapshot");
-    await buckets.eraseSubject(ctx, "snapshot", undefined, 1);
-    const empty = await buckets.eraseSubject(ctx, "snapshot");
-    if (empty !== 0) throw new Error("snapshot was not empty");
-    await buckets.join(ctx, bucketRef, "snapshot");
+    await buckets.join(ctx, bucketRef, "subject");
+    const removed = await buckets.eraseSubject(ctx, "subject", undefined, 1);
+    const empty = await buckets.eraseSubject(ctx, "subject");
+    if (removed !== 1 || empty !== 0)
+      throw new Error("subject batch did not drain");
+    await buckets.join(ctx, bucketRef, "subject");
     // eslint-disable-next-line unicorn/no-null -- Convex mutation return validator requires null.
     return null;
   },

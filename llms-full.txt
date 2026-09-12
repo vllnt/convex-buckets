@@ -42,8 +42,8 @@ Lifecycle: `open` → `locked` (no new joins) → `closed` (terminal).
 - **Leave** while `open` or `locked`, not after `close`.
 - **Pagination** — `paginateMembers` returns a cursor and completion flag;
   `listMembers` is only a bounded preview (default 100, max 500).
-- **Bounded erase** — `eraseBucket` / `eraseSubject` delete in batches and
-  reschedule.
+- **Bounded erase** — `eraseBucket` reschedules fenced batches;
+  `eraseSubject` deletes one batch per call, without background subject sweeps.
 - **Scopes** — default `"global"`.
 
 ## Installation
@@ -136,7 +136,10 @@ continuation uses the original document ID, so stale work cannot erase a
 replacement bucket. Return values count only the current batch; completion is
 observed through `get` returning `null`.
 
-`eraseSubject` captures the newest matching membership creation time and deletes only that snapshot in bounded batches. Later joins survive stale continuations, including recreation in the same transaction. It is not a permanent ban; hosts remain responsible for deciding whether future joins are allowed.
+`eraseSubject` deletes one bounded batch per call and schedules no continuation.
+Block new joins while draining, repeat until it returns zero, then permit joins if
+appropriate. A returned zero is only an observation of current membership, not a
+permanent ban. No queued subject sweep can later remove a recreated membership.
 
 Multiple mounts are isolated: `app.use(bucketsConfig, { name: "first" })` and
 `app.use(bucketsConfig, { name: "second" })`, accessed through separate
@@ -185,6 +188,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Close and recount buckets atomically during erasure; fence scheduled batches
   by document ID.
 - Safely remove orphan subject memberships; reject unsafe integer capacities.
+
+### Changed
+
+- `eraseSubject` now deletes one caller-driven batch, without scheduling future
+  sweeps. Drain under a host write fence until zero; no timestamp-ordering
+  assumption or latent subject job can affect subsequent rejoining.
 
 ### Preview surface
 
@@ -259,7 +268,16 @@ invocation, not the total. Observe `get === null` for completion.
 
 ### `eraseSubject(ctx, subjectRef, scope?, batch?)` → `number`
 
-Captures the newest matching membership’s `_creationTime` and deletes rows at or below that fixed bound. Continuations retain the original bound; later joins survive. Returns only this batch’s deletion count, not completion of every pending batch. Updates bucket counts and tolerates orphan rows. Convex creation timestamps distinguish sequential inserts even within the same transaction; this is tested on the real local backend. This is a snapshot deletion, not a permanent ban.
+Deletes at most `batch` memberships (default 200, max 500), updates bucket counts,
+and tolerates orphan rows. Returns the number deleted in this invocation.
+**Does not schedule a continuation.** The host blocks new joins while repeatedly
+calling this method until it returns zero; it may then permit rejoining without
+latent subject-erasure jobs. Zero is an observation, not a permanent ban or a
+concurrent-write fence.
+
+This replaces the unpublished preview's automatic subject sweep. Callers must
+now drive additional batches. No ordering or uniqueness guarantee is assumed
+for `_creationTime`; it is not a safe generation boundary.
 
 Batch sizes and preview limits must be positive safe integers and are clamped to
 their maximum. Invalid refs, capacity, batch and limit produce code-tagged
@@ -966,14 +984,7 @@ export const eraseSubject = mutation({
     requireRef(ref.scope, "scope");
     requireRef(ref.subjectRef, "subjectRef");
     const batch = parseBatch(ref.batch);
-    const newest = await subjectMembers(ctx, ref).order("desc").first();
-    if (newest === null) return 0;
-    return eraseSubjectBatch(ctx, {
-      batch,
-      scope: ref.scope,
-      subjectRef: ref.subjectRef,
-      through: newest._creationTime,
-    });
+    return eraseSubjectBatch(ctx, { ...ref, batch });
   },
   returns: v.number(),
 });
@@ -982,25 +993,13 @@ type SubjectBatch = {
   batch: number;
   scope: string;
   subjectRef: string;
-  through: number;
 };
-
-function subjectSnapshot(ctx: MutationCtx, ref: SubjectBatch) {
-  return ctx.db
-    .query("members")
-    .withIndex("by_subject", (q) =>
-      q
-        .eq("scope", ref.scope)
-        .eq("subjectRef", ref.subjectRef)
-        .lte("_creationTime", ref.through),
-    );
-}
 
 async function eraseSubjectBatch(
   ctx: MutationCtx,
   ref: SubjectBatch,
 ): Promise<number> {
-  const memberships = await subjectSnapshot(ctx, ref).take(ref.batch);
+  const memberships = await subjectMembers(ctx, ref).take(ref.batch);
   await Promise.all(
     memberships.map(async (membership) => {
       await ctx.db.delete("members", membership._id);
@@ -1011,26 +1010,8 @@ async function eraseSubjectBatch(
         });
     }),
   );
-  if (memberships.length === ref.batch) {
-    await ctx.scheduler.runAfter(
-      0,
-      internal.mutations.continueEraseSubject,
-      ref,
-    );
-  }
   return memberships.length;
 }
-
-export const continueEraseSubject = internalMutation({
-  args: {
-    batch: v.number(),
-    scope: v.string(),
-    subjectRef: v.string(),
-    through: v.number(),
-  },
-  handler: async (ctx, ref) => eraseSubjectBatch(ctx, ref),
-  returns: v.number(),
-});
 
 ```
 

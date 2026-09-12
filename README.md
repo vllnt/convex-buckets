@@ -34,8 +34,8 @@ Lifecycle: `open` → `locked` (no new joins) → `closed` (terminal).
 - **Leave** while `open` or `locked`, not after `close`.
 - **Pagination** — `paginateMembers` returns a cursor and completion flag;
   `listMembers` is only a bounded preview (default 100, max 500).
-- **Bounded erase** — `eraseBucket` / `eraseSubject` delete in batches and
-  reschedule.
+- **Bounded erase** — `eraseBucket` reschedules fenced batches;
+  `eraseSubject` deletes one batch per call, without background subject sweeps.
 - **Scopes** — default `"global"`.
 
 ## Installation
@@ -128,7 +128,10 @@ continuation uses the original document ID, so stale work cannot erase a
 replacement bucket. Return values count only the current batch; completion is
 observed through `get` returning `null`.
 
-`eraseSubject` captures the newest matching membership creation time and deletes only that snapshot in bounded batches. Later joins survive stale continuations, including recreation in the same transaction. It is not a permanent ban; hosts remain responsible for deciding whether future joins are allowed.
+`eraseSubject` deletes one bounded batch per call and schedules no continuation.
+Block new joins while draining, repeat until it returns zero, then permit joins if
+appropriate. A returned zero is only an observation of current membership, not a
+permanent ban. No queued subject sweep can later remove a recreated membership.
 
 Multiple mounts are isolated: `app.use(bucketsConfig, { name: "first" })` and
 `app.use(bucketsConfig, { name: "second" })`, accessed through separate

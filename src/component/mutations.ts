@@ -286,14 +286,7 @@ export const eraseSubject = mutation({
     requireRef(ref.scope, "scope");
     requireRef(ref.subjectRef, "subjectRef");
     const batch = parseBatch(ref.batch);
-    const newest = await subjectMembers(ctx, ref).order("desc").first();
-    if (newest === null) return 0;
-    return eraseSubjectBatch(ctx, {
-      batch,
-      scope: ref.scope,
-      subjectRef: ref.subjectRef,
-      through: newest._creationTime,
-    });
+    return eraseSubjectBatch(ctx, { ...ref, batch });
   },
   returns: v.number(),
 });
@@ -302,25 +295,13 @@ type SubjectBatch = {
   batch: number;
   scope: string;
   subjectRef: string;
-  through: number;
 };
-
-function subjectSnapshot(ctx: MutationCtx, ref: SubjectBatch) {
-  return ctx.db
-    .query("members")
-    .withIndex("by_subject", (q) =>
-      q
-        .eq("scope", ref.scope)
-        .eq("subjectRef", ref.subjectRef)
-        .lte("_creationTime", ref.through),
-    );
-}
 
 async function eraseSubjectBatch(
   ctx: MutationCtx,
   ref: SubjectBatch,
 ): Promise<number> {
-  const memberships = await subjectSnapshot(ctx, ref).take(ref.batch);
+  const memberships = await subjectMembers(ctx, ref).take(ref.batch);
   await Promise.all(
     memberships.map(async (membership) => {
       await ctx.db.delete("members", membership._id);
@@ -331,23 +312,5 @@ async function eraseSubjectBatch(
         });
     }),
   );
-  if (memberships.length === ref.batch) {
-    await ctx.scheduler.runAfter(
-      0,
-      internal.mutations.continueEraseSubject,
-      ref,
-    );
-  }
   return memberships.length;
 }
-
-export const continueEraseSubject = internalMutation({
-  args: {
-    batch: v.number(),
-    scope: v.string(),
-    subjectRef: v.string(),
-    through: v.number(),
-  },
-  handler: async (ctx, ref) => eraseSubjectBatch(ctx, ref),
-  returns: v.number(),
-});

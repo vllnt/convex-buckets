@@ -60,7 +60,16 @@ invocation, not the total. Observe `get === null` for completion.
 
 ### `eraseSubject(ctx, subjectRef, scope?, batch?)` → `number`
 
-Captures the newest matching membership’s `_creationTime` and deletes rows at or below that fixed bound. Continuations retain the original bound; later joins survive. Returns only this batch’s deletion count, not completion of every pending batch. Updates bucket counts and tolerates orphan rows. Convex creation timestamps distinguish sequential inserts even within the same transaction; this is tested on the real local backend. This is a snapshot deletion, not a permanent ban.
+Deletes at most `batch` memberships (default 200, max 500), updates bucket counts,
+and tolerates orphan rows. Returns the number deleted in this invocation.
+**Does not schedule a continuation.** The host blocks new joins while repeatedly
+calling this method until it returns zero; it may then permit rejoining without
+latent subject-erasure jobs. Zero is an observation, not a permanent ban or a
+concurrent-write fence.
+
+This replaces the unpublished preview's automatic subject sweep. Callers must
+now drive additional batches. No ordering or uniqueness guarantee is assumed
+for `_creationTime`; it is not a safe generation boundary.
 
 Batch sizes and preview limits must be positive safe integers and are clamped to
 their maximum. Invalid refs, capacity, batch and limit produce code-tagged
