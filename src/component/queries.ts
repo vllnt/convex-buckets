@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { query } from "./_generated/server";
 import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "../shared";
@@ -32,6 +33,40 @@ export const get = query({
   },
 });
 
+export const paginateMembers = query({
+  args: {
+    bucketRef: v.string(),
+    scope: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: v.object({
+    page: v.array(memberState),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const size = args.paginationOpts.numItems;
+    if (!Number.isSafeInteger(size) || size < 1 || size > MAX_LIST_LIMIT) {
+      fail("INVALID_LIMIT", `numItems must be 1..${MAX_LIST_LIMIT}`);
+    }
+    const result = await ctx.db
+      .query("members")
+      .withIndex("by_bucket", (q) =>
+        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
+      )
+      .paginate(args.paginationOpts);
+    return {
+      page: result.page.map((member) => ({
+        joinedAt: member.joinedAt,
+        subjectRef: member.subjectRef,
+      })),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
+  },
+});
+
+/** Bounded preview; use paginateMembers to enumerate a bucket. */
 export const listMembers = query({
   args: {
     bucketRef: v.string(),

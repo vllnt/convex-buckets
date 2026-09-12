@@ -1,6 +1,11 @@
 import { ConvexError, v } from "convex/values";
-import { api } from "./_generated/api";
-import { mutation } from "./_generated/server";
+import { api, internal } from "./_generated/api";
+import {
+  internalMutation,
+  mutation,
+  type MutationCtx,
+} from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import {
   DEFAULT_ERASE_BATCH,
   MAX_ERASE_BATCH,
@@ -37,7 +42,7 @@ export const open = mutation({
   returns: v.string(),
   handler: async (ctx, args) => {
     if (args.capacity !== undefined) {
-      if (!Number.isInteger(args.capacity) || args.capacity < 1) {
+      if (!Number.isSafeInteger(args.capacity) || args.capacity < 1) {
         fail("INVALID_CAPACITY", "capacity must be a positive integer");
       }
     }
@@ -50,7 +55,10 @@ export const open = mutation({
       )
       .unique();
     if (existing !== null) {
-      fail("BUCKET_EXISTS", "a bucket with this ref already exists in the scope");
+      fail(
+        "BUCKET_EXISTS",
+        "a bucket with this ref already exists in the scope",
+      );
     }
     await ctx.db.insert("buckets", {
       bucketRef,
@@ -210,32 +218,54 @@ export const eraseBucket = mutation({
   handler: async (ctx, args) => {
     requireRef(args.bucketRef, "bucketRef");
     const batch = parseBatch(args.batch);
-    const members = await ctx.db
-      .query("members")
-      .withIndex("by_bucket", (q) =>
-        q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
-      )
-      .take(batch);
-    await Promise.all(members.map((member) => ctx.db.delete("members", member._id)));
-    if (members.length === batch) {
-      await ctx.scheduler.runAfter(0, api.mutations.eraseBucket, {
-        batch,
-        bucketRef: args.bucketRef,
-        scope: args.scope,
-      });
-      return members.length;
-    }
     const bucket = await ctx.db
       .query("buckets")
       .withIndex("by_scope_ref", (q) =>
         q.eq("scope", args.scope).eq("bucketRef", args.bucketRef),
       )
       .unique();
-    if (bucket !== null) {
-      await ctx.db.delete("buckets", bucket._id);
-    }
-    return members.length;
+    if (bucket === null) return 0;
+    return eraseBucketBatch(ctx, bucket._id, batch);
   },
+});
+
+async function eraseBucketBatch(
+  ctx: MutationCtx,
+  bucketId: Id<"buckets">,
+  batch: number,
+): Promise<number> {
+  const bucket = await ctx.db.get("buckets", bucketId);
+  if (bucket === null) return 0;
+  const members = await ctx.db
+    .query("members")
+    .withIndex("by_bucket", (q) =>
+      q.eq("scope", bucket.scope).eq("bucketRef", bucket.bucketRef),
+    )
+    .take(batch);
+  await Promise.all(
+    members.map((member) => ctx.db.delete("members", member._id)),
+  );
+  if (members.length < batch) {
+    await ctx.db.delete("buckets", bucketId);
+  } else {
+    await ctx.db.patch("buckets", bucketId, {
+      status: "closed",
+      closedAt: bucket.closedAt ?? Date.now(),
+      memberCount: Math.max(0, bucket.memberCount - members.length),
+    });
+    await ctx.scheduler.runAfter(0, internal.mutations.continueEraseBucket, {
+      bucketId,
+      batch,
+    });
+  }
+  return members.length;
+}
+
+export const continueEraseBucket = internalMutation({
+  args: { bucketId: v.id("buckets"), batch: v.number() },
+  returns: v.number(),
+  handler: async (ctx, args) =>
+    eraseBucketBatch(ctx, args.bucketId, parseBatch(args.batch)),
 });
 
 export const eraseSubject = mutation({
@@ -260,12 +290,16 @@ export const eraseSubject = mutation({
         const bucket = await ctx.db
           .query("buckets")
           .withIndex("by_scope_ref", (q) =>
-            q.eq("scope", membership.scope).eq("bucketRef", membership.bucketRef),
+            q
+              .eq("scope", membership.scope)
+              .eq("bucketRef", membership.bucketRef),
           )
           .unique();
-        await ctx.db.patch("buckets", bucket!._id, {
-          memberCount: bucket!.memberCount - 1,
-        });
+        if (bucket !== null) {
+          await ctx.db.patch("buckets", bucket._id, {
+            memberCount: Math.max(0, bucket.memberCount - 1),
+          });
+        }
       }),
     );
     if (memberships.length === batch) {

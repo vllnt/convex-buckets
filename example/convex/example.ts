@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { components } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
 import { Buckets } from "../../src/client";
@@ -20,7 +21,11 @@ export const open = mutation({
   },
   returns: v.string(),
   handler: (ctx, a) =>
-    buckets.open(ctx, { bucketRef: a.bucketRef, capacity: a.capacity, scope: a.scope }),
+    buckets.open(ctx, {
+      bucketRef: a.bucketRef,
+      capacity: a.capacity,
+      scope: a.scope,
+    }),
 });
 
 export const join = mutation({
@@ -61,6 +66,21 @@ export const get = query({
   handler: (ctx, a) => buckets.get(ctx, a.bucketRef, a.scope),
 });
 
+export const paginateMembers = query({
+  args: {
+    bucketRef: v.string(),
+    scope: v.optional(v.string()),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: v.object({
+    page: v.array(memberState),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
+  handler: (ctx, a) =>
+    buckets.paginateMembers(ctx, a.bucketRef, a.paginationOpts, a.scope),
+});
+
 export const listMembers = query({
   args: {
     bucketRef: v.string(),
@@ -68,8 +88,7 @@ export const listMembers = query({
     scope: v.optional(v.string()),
   },
   returns: v.array(memberState),
-  handler: (ctx, a) =>
-    buckets.listMembers(ctx, a.bucketRef, a.scope, a.limit),
+  handler: (ctx, a) => buckets.listMembers(ctx, a.bucketRef, a.scope, a.limit),
 });
 
 export const eraseBucket = mutation({

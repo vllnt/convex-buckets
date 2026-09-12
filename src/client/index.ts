@@ -2,6 +2,8 @@ import type {
   FunctionArgs,
   FunctionReference,
   FunctionReturnType,
+  PaginationOptions,
+  PaginationResult,
 } from "convex/server";
 import type {
   BucketState,
@@ -11,7 +13,11 @@ import type {
   MemberState,
   OpenOptions,
 } from "./types.js";
-import { DEFAULT_ERASE_BATCH, DEFAULT_LIST_LIMIT, DEFAULT_SCOPE } from "../shared.js";
+import {
+  DEFAULT_ERASE_BATCH,
+  DEFAULT_LIST_LIMIT,
+  DEFAULT_SCOPE,
+} from "../shared.js";
 
 export interface BucketsComponent {
   mutations: {
@@ -59,6 +65,12 @@ export interface BucketsComponent {
     >;
   };
   queries: {
+    paginateMembers: FunctionReference<
+      "query",
+      "internal",
+      { bucketRef: string; scope: string; paginationOpts: PaginationOptions },
+      PaginationResult<MemberState>
+    >;
     get: FunctionReference<
       "query",
       "internal",
@@ -136,7 +148,11 @@ export class Buckets {
     });
   }
 
-  lock(ctx: RunMutationCtx, bucketRef: string, scope?: string): Promise<boolean> {
+  lock(
+    ctx: RunMutationCtx,
+    bucketRef: string,
+    scope?: string,
+  ): Promise<boolean> {
     return ctx.runMutation(this.component.mutations.lock, {
       scope: this.scopeOf(scope),
       bucketRef,
@@ -162,6 +178,19 @@ export class Buckets {
     return ctx.runQuery(this.component.queries.get, {
       scope: this.scopeOf(scope),
       bucketRef,
+    });
+  }
+
+  paginateMembers(
+    ctx: RunQueryCtx,
+    bucketRef: string,
+    paginationOpts: PaginationOptions,
+    scope?: string,
+  ): Promise<PaginationResult<MemberState>> {
+    return ctx.runQuery(this.component.queries.paginateMembers, {
+      bucketRef,
+      paginationOpts,
+      scope: this.scopeOf(scope),
     });
   }
 

@@ -2,12 +2,15 @@
 
 > Ephemeral groups of opaque subject refs as a Convex component
 
-`@vllnt/convex-buckets` is a publishable Convex component. It targets `convex@^1.45.0`.
+`@vllnt/convex-buckets` is an unpublished private-preview Convex component. It targets `convex@^1.45.0`.
 It stores two sandboxed tables — `buckets` (`bucketRef`, `status` open/locked/closed, `capacity`,
 `memberCount`, timestamps) and `members` (`bucketRef`, `subjectRef`, `joinedAt`). `open` creates a
 group; `join` / `leave` mutate membership; `lock` stops joins; `close` is terminal. Capacity is
 OCC-safe because `join` patches `memberCount` on the bucket row. `listMembers` is bounded (default
-100, max 500). `eraseBucket` / `eraseSubject` delete in bounded batches and reschedule. The host
+100, max 500); use `paginateMembers(ctx, bucketRef, paginationOpts, scope?)` for cursor traversal.
+`eraseBucket` closes and recounts atomically, reserving the ref until cleanup completes;
+continuations are fenced by document ID. `eraseSubject` is a best-effort sweep, not a ban:
+hosts must stop new joins during privacy erasure. Both delete in bounded batches and reschedule. The host
 owns auth and the meaning of the group. Distinct from `@vllnt/convex-memberships` (standing
 org/roles) and `@convex-dev/presence` (liveness).
 
@@ -21,7 +24,8 @@ org/roles) and `@convex-dev/presence` (liveness).
 ## Examples
 
 - [Example component wrapper](example/convex/example.ts): Host-app wrapper functions
-- [Example tests](example/convex/example.test.ts): End-to-end usage coverage with `convex-test`
+- [Example tests](example/convex/example.test.ts): Simulated usage coverage with `convex-test`
+- [Local runtime check](example/convex/runtimeCheck.ts): Actual local backend concurrent admission and scheduler check
 
 ## Optional
 

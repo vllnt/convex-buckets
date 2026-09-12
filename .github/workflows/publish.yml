@@ -26,8 +26,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
   quality:
@@ -45,6 +44,7 @@ jobs:
       - run: pnpm typecheck:ci
       - run: pnpm test:coverage
       - run: pnpm build
+      - run: pnpm test:package
 
   canary:
     name: Publish Canary
@@ -89,7 +89,7 @@ jobs:
   release:
     name: Publish Release
     needs: quality
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && vars.RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -187,7 +187,8 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NOTES: ${{ steps.changelog.outputs.body }}
         run: |
           gh release create "v${{ steps.version.outputs.version }}" \
             --title "@vllnt/convex-buckets v${{ steps.version.outputs.version }}" \
-            --notes "${{ steps.changelog.outputs.body }}"
+            --notes "$RELEASE_NOTES"

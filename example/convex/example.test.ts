@@ -3,7 +3,12 @@ import { describe, expect, test } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import { register } from "../../src/test";
-import { clampEraseBatch, clampListLimit, MAX_ERASE_BATCH, MAX_LIST_LIMIT } from "../../src/shared";
+import {
+  clampEraseBatch,
+  clampListLimit,
+  MAX_ERASE_BATCH,
+  MAX_LIST_LIMIT,
+} from "../../src/shared";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -25,7 +30,17 @@ describe("buckets — lifecycle", () => {
       await t.mutation(api.example.join, { bucketRef: ref, subjectRef: "b" }),
     ).toEqual({ joined: true });
     const state = await t.query(api.example.get, { bucketRef: ref });
-    expect(state).toMatchObject({ status: "open", memberCount: 2, capacity: 2 });
+    expect(state).toMatchObject({
+      status: "open",
+      memberCount: 2,
+      capacity: 2,
+    });
+    const page = await t.query(api.example.paginateMembers, {
+      bucketRef: ref,
+      paginationOpts: { cursor: null, numItems: 1 },
+    });
+    expect(page.page).toHaveLength(1);
+    expect(page.isDone).toBe(false);
     const members = await t.query(api.example.listMembers, { bucketRef: ref });
     expect(members.map((m) => m.subjectRef).sort()).toEqual(["a", "b"]);
   });
@@ -51,7 +66,10 @@ describe("buckets — lifecycle", () => {
       await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "b" }),
     ).toEqual({ joined: false, reason: "full" });
     expect(
-      await t.mutation(api.example.join, { bucketRef: "nope", subjectRef: "a" }),
+      await t.mutation(api.example.join, {
+        bucketRef: "nope",
+        subjectRef: "a",
+      }),
     ).toEqual({ joined: false, reason: "missing" });
   });
 
@@ -82,14 +100,24 @@ describe("buckets — lifecycle", () => {
     await t.mutation(api.example.open, { bucketRef: "m" });
     expect(await t.mutation(api.example.close, { bucketRef: "m" })).toBe(true);
     expect(
-      await t.mutation(api.example.leave, { bucketRef: "missing", subjectRef: "a" }),
+      await t.mutation(api.example.leave, {
+        bucketRef: "missing",
+        subjectRef: "a",
+      }),
     ).toBe(false);
     expect(
-      await t.mutation(api.example.leave, { bucketRef: "m", subjectRef: "ghost" }),
+      await t.mutation(api.example.leave, {
+        bucketRef: "m",
+        subjectRef: "ghost",
+      }),
     ).toBe(false);
     expect(await t.query(api.example.get, { bucketRef: "nope" })).toBeNull();
-    expect(await t.mutation(api.example.lock, { bucketRef: "nope" })).toBe(false);
-    expect(await t.mutation(api.example.close, { bucketRef: "nope" })).toBe(false);
+    expect(await t.mutation(api.example.lock, { bucketRef: "nope" })).toBe(
+      false,
+    );
+    expect(await t.mutation(api.example.close, { bucketRef: "nope" })).toBe(
+      false,
+    );
   });
 
   test("eraseBucket batches members", async () => {
@@ -100,20 +128,28 @@ describe("buckets — lifecycle", () => {
     expect(
       await t.mutation(api.example.eraseBucket, { bucketRef: "m", batch: 1 }),
     ).toBe(1);
-    expect(await t.mutation(api.example.eraseBucket, { bucketRef: "m" })).toBe(1);
+    expect(await t.mutation(api.example.eraseBucket, { bucketRef: "m" })).toBe(
+      1,
+    );
   });
 
   test("eraseBucket and eraseSubject", async () => {
     const t = setup();
     await t.mutation(api.example.open, { bucketRef: "m" });
     await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "a" });
-    expect(await t.mutation(api.example.eraseSubject, { subjectRef: "a" })).toBe(1);
     expect(
-      await t.query(api.example.listMembers, { bucketRef: "m" }),
-    ).toEqual([]);
-    expect(await t.mutation(api.example.eraseBucket, { bucketRef: "m" })).toBe(0);
+      await t.mutation(api.example.eraseSubject, { subjectRef: "a" }),
+    ).toBe(1);
+    expect(await t.query(api.example.listMembers, { bucketRef: "m" })).toEqual(
+      [],
+    );
+    expect(await t.mutation(api.example.eraseBucket, { bucketRef: "m" })).toBe(
+      0,
+    );
     expect(await t.query(api.example.get, { bucketRef: "m" })).toBeNull();
-    expect(await t.mutation(api.example.eraseBucket, { bucketRef: "m" })).toBe(0);
+    expect(await t.mutation(api.example.eraseBucket, { bucketRef: "m" })).toBe(
+      0,
+    );
   });
 
   test("eraseSubject batches memberships", async () => {
@@ -125,16 +161,19 @@ describe("buckets — lifecycle", () => {
     expect(
       await t.mutation(api.example.eraseSubject, { subjectRef: "a", batch: 1 }),
     ).toBe(1);
-    expect(await t.mutation(api.example.eraseSubject, { subjectRef: "a" })).toBe(
-      1,
-    );
+    expect(
+      await t.mutation(api.example.eraseSubject, { subjectRef: "a" }),
+    ).toBe(1);
   });
 
   test("leave unknown member on an open bucket", async () => {
     const t = setup();
     await t.mutation(api.example.open, { bucketRef: "m" });
     expect(
-      await t.mutation(api.example.leave, { bucketRef: "m", subjectRef: "ghost" }),
+      await t.mutation(api.example.leave, {
+        bucketRef: "m",
+        subjectRef: "ghost",
+      }),
     ).toBe(false);
   });
 
@@ -142,7 +181,9 @@ describe("buckets — lifecycle", () => {
     const t = setup();
     await t.mutation(api.example.open, { bucketRef: "m" });
     await t.mutation(api.example.join, { bucketRef: "m", subjectRef: "a" });
-    expect(await t.mutation(api.example.eraseBucket, { bucketRef: "m" })).toBe(1);
+    expect(await t.mutation(api.example.eraseBucket, { bucketRef: "m" })).toBe(
+      1,
+    );
     expect(await t.query(api.example.get, { bucketRef: "m" })).toBeNull();
   });
 });
@@ -168,8 +209,12 @@ describe("buckets — validation and scope", () => {
     await expect(
       t.mutation(api.example.leave, { bucketRef: "m", subjectRef: "" }),
     ).rejects.toThrow();
-    await expect(t.mutation(api.example.lock, { bucketRef: "" })).rejects.toThrow();
-    await expect(t.mutation(api.example.close, { bucketRef: "" })).rejects.toThrow();
+    await expect(
+      t.mutation(api.example.lock, { bucketRef: "" }),
+    ).rejects.toThrow();
+    await expect(
+      t.mutation(api.example.close, { bucketRef: "" }),
+    ).rejects.toThrow();
     await expect(
       t.mutation(api.example.eraseBucket, { bucketRef: "" }),
     ).rejects.toThrow();

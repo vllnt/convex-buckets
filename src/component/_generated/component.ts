@@ -10,16 +10,17 @@
 
 import type { FunctionReference } from "convex/server";
 
-type BucketState = {
-  bucketRef: string;
-  capacity?: number;
-  closedAt?: number;
-  lockedAt?: number;
-  memberCount: number;
-  openedAt: number;
-  status: "open" | "locked" | "closed";
-};
-
+/**
+ * A utility for referencing a Convex component's exposed API.
+ *
+ * Useful when expecting a parameter like `components.myComponent`.
+ * Usage:
+ * ```ts
+ * async function myFunction(ctx: QueryCtx, component: ComponentApi) {
+ *   return ctx.runQuery(component.someFile.someQuery, { ...args });
+ * }
+ * ```
+ */
 export type ComponentApi<Name extends string | undefined = string | undefined> =
   {
     mutations: {
@@ -78,14 +79,44 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "query",
         "internal",
         { bucketRef: string; scope: string },
-        BucketState | null,
+        null | {
+          bucketRef: string;
+          capacity?: number;
+          closedAt?: number;
+          lockedAt?: number;
+          memberCount: number;
+          openedAt: number;
+          status: "open" | "locked" | "closed";
+        },
         Name
       >;
       listMembers: FunctionReference<
         "query",
         "internal",
         { bucketRef: string; limit?: number; scope: string },
-        { joinedAt: number; subjectRef: string }[],
+        Array<{ joinedAt: number; subjectRef: string }>,
+        Name
+      >;
+      paginateMembers: FunctionReference<
+        "query",
+        "internal",
+        {
+          bucketRef: string;
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+          scope: string;
+        },
+        {
+          continueCursor: string;
+          isDone: boolean;
+          page: Array<{ joinedAt: number; subjectRef: string }>;
+        },
         Name
       >;
     };

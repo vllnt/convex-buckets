@@ -39,13 +39,14 @@
     "build:clean": "rm -rf dist *.tsbuildinfo && pnpm build:codegen",
     "typecheck": "tsc --noEmit",
     "typecheck:ci": "tsc --noEmit --project tsconfig.ci.json",
-    "lint": "pnpm check:agents && eslint .",
-    "test": "vitest run --passWithNoTests",
+    "lint": "pnpm check:agents && eslint . --max-warnings 0",
+    "test": "vitest run",
     "test:watch": "vitest --typecheck --clearScreen false",
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
     "generate:llms": "node scripts/generate-llms.mjs",
     "preversion": "pnpm install --frozen-lockfile && pnpm build && pnpm test:coverage && pnpm typecheck && pnpm generate:llms",
-    "prepublishOnly": "npm whoami || npm login",
+    "prepublishOnly": "pnpm install --frozen-lockfile && pnpm build && pnpm typecheck && pnpm lint && pnpm test:coverage",
+    "test:package": "node scripts/test-package.mjs",
     "alpha": "npm version prerelease --preid alpha && npm publish --tag alpha && git push --follow-tags",
     "release": "npm version patch && npm publish && git push --follow-tags",
     "check:agents": "node -e \"const f=require('node:fs');if(!f.existsSync('AGENTS.md')||f.existsSync('CLAUDE.md')||f.existsSync('.claude'))process.exit(1)\"",
@@ -85,7 +86,7 @@
     "url": "https://github.com/vllnt/convex-buckets"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19.0"
   },
   "publishConfig": {
     "access": "public"

@@ -1,4 +1,5 @@
 <!-- Badges -->
+
 [![convex-component](https://img.shields.io/badge/convex-component-EE342F.svg)](https://www.convex.dev/components)
 [![npm](https://img.shields.io/npm/v/@vllnt/convex-buckets.svg)](https://www.npmjs.com/package/@vllnt/convex-buckets)
 [![CI](https://github.com/vllnt/convex-buckets/actions/workflows/ci.yml/badge.svg)](https://github.com/vllnt/convex-buckets/actions/workflows/ci.yml)
@@ -7,6 +8,9 @@
 # @vllnt/convex-buckets
 
 Ephemeral groups of opaque `subjectRef`s — matches, lobbies, cohorts.
+
+Unreleased private preview; the installation command below describes the planned
+package.
 
 Not standing orgs (`@vllnt/convex-memberships`), not liveness
 (`@convex-dev/presence`).
@@ -23,11 +27,15 @@ Lifecycle: `open` → `locked` (no new joins) → `closed` (terminal).
 
 ## Features
 
-- **Capacity + OCC** — `memberCount` lives on the bucket row so concurrent joins retry instead of overfilling.
-- **Join reasons** — `missing` / `locked` / `closed` / `already_member` / `full`.
+- **Capacity + OCC** — `memberCount` lives on the bucket row so concurrent joins
+  retry instead of overfilling.
+- **Join reasons** — `missing` / `locked` / `closed` / `already_member` /
+  `full`.
 - **Leave** while `open` or `locked`, not after `close`.
-- **Bounded list** — `listMembers` defaults to 100 rows (max 500).
-- **Bounded erase** — `eraseBucket` / `eraseSubject` delete in batches and reschedule.
+- **Pagination** — `paginateMembers` returns a cursor and completion flag;
+  `listMembers` is only a bounded preview (default 100, max 500).
+- **Bounded erase** — `eraseBucket` / `eraseSubject` delete in batches and
+  reschedule.
 - **Scopes** — default `"global"`.
 
 ## Installation
@@ -51,6 +59,7 @@ export default app;
 ```
 
 ```ts
+import { v } from "convex/values";
 import { components } from "./_generated/api";
 import { mutation } from "./_generated/server";
 import { Buckets } from "@vllnt/convex-buckets";
@@ -59,6 +68,7 @@ const buckets = new Buckets(components.buckets);
 
 export const startMatch = mutation({
   args: {},
+  returns: v.string(),
   handler: async (ctx) => {
     const subjectRef = /* host-resolved identity */ "user_1";
     const id = await buckets.open(ctx, { capacity: 4 });
@@ -71,15 +81,16 @@ export const startMatch = mutation({
 
 ## API Reference
 
-| Method | Kind | Result |
-|--------|------|--------|
-| `open(ctx, opts?)` | mutation | `bucketRef` |
-| `join(ctx, bucketRef, subjectRef, scope?)` | mutation | `{ joined, reason? }` |
-| `leave(ctx, bucketRef, subjectRef, scope?)` | mutation | `boolean` |
-| `lock` / `close` | mutation | `boolean` |
-| `get(ctx, bucketRef, scope?)` | query | bucket state or `null` |
-| `listMembers(ctx, bucketRef, scope?, limit?)` | query | `{ subjectRef, joinedAt }[]` |
-| `eraseBucket` / `eraseSubject` | mutation | `number` deleted this pass |
+| Method                                                    | Kind     | Result                                       |
+| --------------------------------------------------------- | -------- | -------------------------------------------- |
+| `open(ctx, opts?)`                                        | mutation | `bucketRef`                                  |
+| `join(ctx, bucketRef, subjectRef, scope?)`                | mutation | `{ joined, reason? }`                        |
+| `leave(ctx, bucketRef, subjectRef, scope?)`               | mutation | `boolean`                                    |
+| `lock` / `close`                                          | mutation | `boolean`                                    |
+| `get(ctx, bucketRef, scope?)`                             | query    | bucket state or `null`                       |
+| `listMembers(ctx, bucketRef, scope?, limit?)`             | query    | bounded preview `{ subjectRef, joinedAt }[]` |
+| `paginateMembers(ctx, bucketRef, paginationOpts, scope?)` | query    | `{ page, isDone, continueCursor }`           |
+| `eraseBucket` / `eraseSubject`                            | mutation | `number` deleted this pass                   |
 
 Full reference: [docs/API.md](docs/API.md).
 
@@ -89,7 +100,9 @@ Backend-only — no `./react` entry.
 
 ## Security
 
-- Auth-agnostic — the host resolves identity and passes an opaque `subjectRef`.
+- Auth-agnostic — the host must authorize every read/write and derive allowed
+  scopes and subject refs. Scopes are namespaces, not authorization. The
+  unauthenticated example is for local testing only.
 - Tables sandboxed — reached only through the exported functions.
 - Capacity is enforced by patching `memberCount` on the bucket document (OCC).
 
@@ -100,7 +113,30 @@ pnpm test
 pnpm test:coverage
 ```
 
-Tests run against the real component runtime via `convex-test` (`@edge-runtime/vm`).
+Unit tests use the simulated `convex-test` runtime (`@edge-runtime/vm`), not a
+real backend. `example/convex/runtimeCheck.ts` additionally checks concurrent
+capacity admission and scheduled cleanup on a real local Convex backend. Run
+with an isolated HOME and
+`CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --local-cloud-port 3330 --local-site-port 3331 --run runtimeCheck:verify`.
+This is targeted evidence, not proof of every concurrency interleaving.
+
+## Cleanup and isolation
+
+`eraseBucket` closes the bucket and updates its remaining count in the first
+transaction. Its ref stays reserved until all members are removed. Scheduled
+continuation uses the original document ID, so stale work cannot erase a
+replacement bucket. Return values count only the current batch; completion is
+observed through `get` returning `null`.
+
+`eraseSubject` is a best-effort batched sweep, not a permanent ban or snapshot.
+The host must prevent new joins for that subject while erasing if it needs a
+complete privacy deletion; otherwise later joins may also be swept or survive
+after completion. Orphan memberships are removed safely.
+
+Multiple mounts are isolated: `app.use(bucketsConfig, { name: "first" })` and
+`app.use(bucketsConfig, { name: "second" })`, accessed through separate
+`Buckets(components.first)` / `Buckets(components.second)` clients. Scopes
+partition data within one mount.
 
 ## Contributing
 
@@ -108,9 +144,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Author
 
-Built by [bntvllnt](https://github.com/bntvllnt) · [bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt)
+Built by [bntvllnt](https://github.com/bntvllnt) ·
+[bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt)
 
-Part of the [@vllnt](https://github.com/vllnt) Convex component fleet — [vllnt.com](https://vllnt.com)
+Part of the [@vllnt](https://github.com/vllnt) Convex component fleet —
+[vllnt.com](https://vllnt.com)
 
 If this is useful, [sponsor the work](https://github.com/sponsors/bntvllnt).
 
