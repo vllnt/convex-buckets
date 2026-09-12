@@ -1,0 +1,35 @@
+# @vllnt/convex-buckets
+
+> Ephemeral groups of opaque subject refs as a Convex component
+
+`@vllnt/convex-buckets` is an unpublished private-preview Convex component. It targets `convex@^1.45.0`.
+It stores two sandboxed tables — `buckets` (`bucketRef`, `status` open/locked/closed, `capacity`,
+`memberCount`, timestamps) and `members` (`bucketRef`, `subjectRef`, `joinedAt`). `open` creates a
+group; `join` / `leave` mutate membership; `lock` stops joins; `close` is terminal. Capacity is
+OCC-safe because `join` patches `memberCount` on the bucket row. `listMembers` is bounded (default
+100, max 500); use `paginateMembers(ctx, bucketRef, paginationOpts, scope?)` for cursor traversal.
+`eraseBucket` closes and recounts atomically, reserving the ref until cleanup completes;
+continuations are fenced by document ID. `eraseSubject` deletes one bounded batch per call and schedules no continuation: the host blocks joins and repeats calls until zero. It is not a permanent ban. The host
+owns auth and the meaning of the group. Distinct from `@vllnt/convex-memberships` (standing
+org/roles) and `@convex-dev/presence` (liveness).
+
+## Docs
+
+- [README](README.md): Project overview, installation, usage examples, architecture
+- [API Reference](docs/API.md): Public class methods, return shapes, input validation
+- [Changelog](CHANGELOG.md): Version history and release notes
+- [Contributing](CONTRIBUTING.md): Development setup, validation commands, release workflow
+
+## Examples
+
+- [Example component wrapper](example/convex/mutations.ts): Host-app wrapper functions
+- [Example tests](example/convex/example.test.ts): Simulated usage coverage with `convex-test`
+- [Local runtime check](example/convex/actions.ts): Actual local backend concurrent admission and scheduler check
+
+## Optional
+
+- [AGENTS](AGENTS.md): Canonical agent instructions for this repository
+- [Security Policy](SECURITY.md): Vulnerability reporting policy
+- [Code of Conduct](CODE_OF_CONDUCT.md): Community participation guidelines
+- [License](LICENSE): MIT license
+- [Full source bundle](llms-full.txt): Aggregated README, changelog, API docs, and key source files

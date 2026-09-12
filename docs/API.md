@@ -1,0 +1,78 @@
+# API Reference — @vllnt/convex-buckets
+
+**Compatibility:** `convex@^1.45.0`
+
+```ts
+import { Buckets } from "@vllnt/convex-buckets";
+
+const buckets = new Buckets(components.buckets, { defaultScope: "global" });
+```
+
+`bucketRef` and `subjectRef` are opaque host strings (1..256 characters).
+
+### `open(ctx, { bucketRef?, capacity?, scope? })` → `bucketRef`
+
+Creates an `open` bucket. `capacity` must be a positive safe integer when set.
+Host-supplied `bucketRef` must be unique in the scope (`BUCKET_EXISTS`).
+
+### `join(ctx, bucketRef, subjectRef, scope?)`
+
+`{ joined: true }` or `{ joined: false, reason }`.
+
+Reasons: `missing` | `locked` | `closed` | `already_member` | `full`.
+
+Capacity uses `memberCount` on the bucket row (OCC-safe).
+
+### `leave(ctx, bucketRef, subjectRef, scope?)` → `boolean`
+
+Allowed while `open` or `locked`. Returns `false` if closed, missing, or not a
+member.
+
+### `lock(ctx, bucketRef, scope?)` / `close(ctx, bucketRef, scope?)` → `boolean`
+
+`lock` only from `open`. `close` from `open` or `locked` (terminal).
+
+### `get(ctx, bucketRef, scope?)`
+
+Bucket state including `memberCount`, or `null`.
+
+### `listMembers(ctx, bucketRef, scope?, limit?)`
+
+Returns a bounded preview array, default `limit` 100, max 500. It does not
+indicate truncation. Use pagination to enumerate all members.
+
+### `paginateMembers(ctx, bucketRef, paginationOpts, scope?)`
+
+`paginationOpts` is Convex `PaginationOptions`: start with
+`{ cursor: null, numItems: 100 }`, then pass the returned `continueCursor` until
+`isDone`. `numItems` must be an integer in 1..500. Returns
+`{ page: { subjectRef, joinedAt }[], isDone, continueCursor }`, ordered by
+membership creation within the scope and bucket. Pagination across separate
+calls is not a frozen snapshot under concurrent writes.
+
+### `eraseBucket(ctx, bucketRef, scope?, batch?)` → `number`
+
+Closes the bucket atomically, deletes up to `batch` members (default 200, max
+500), and updates the remaining count. Reschedules by original bucket document
+ID until removed. The ref cannot be reused while cleanup is pending; stale
+continuations cannot touch a replacement. Returns only rows deleted in this
+invocation, not the total. Observe `get === null` for completion.
+
+### `eraseSubject(ctx, subjectRef, scope?, batch?)` → `number`
+
+Deletes at most `batch` memberships (default 200, max 500), updates bucket counts,
+and tolerates orphan rows. Returns the number deleted in this invocation.
+**Does not schedule a continuation.** The host blocks new joins while repeatedly
+calling this method until it returns zero; it may then permit rejoining without
+latent subject-erasure jobs. Zero is an observation, not a permanent ban or a
+concurrent-write fence.
+
+This replaces the unpublished preview's automatic subject sweep. Callers must
+now drive additional batches. No ordering or uniqueness guarantee is assumed
+for `_creationTime`; it is not a safe generation boundary.
+
+Batch sizes and preview limits must be positive safe integers and are clamped to
+their maximum. Invalid refs, capacity, batch and limit produce code-tagged
+`ConvexError`s (`INVALID_REF`, `INVALID_CAPACITY`, `INVALID_BATCH`,
+`INVALID_LIMIT`). Scope, bucket and subject refs enforce 1..256 characters,
+including reads. The host must authorize scope; it is not an access-control boundary.
