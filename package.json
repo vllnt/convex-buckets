@@ -1,7 +1,7 @@
 {
   "name": "@vllnt/convex-buckets",
   "version": "0.1.0",
-  "description": "Ephemeral groups of opaque subject refs — matches, lobbies, cohorts — as a Convex component",
+  "description": "Ephemeral groups of opaque subject refs \u2014 matches, lobbies, cohorts \u2014 as a Convex component",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@9.15.4",
@@ -39,18 +39,18 @@
     "build:clean": "rm -rf dist *.tsbuildinfo && pnpm build:codegen",
     "typecheck": "tsc --noEmit",
     "typecheck:ci": "tsc --noEmit --project tsconfig.ci.json",
-    "lint": "pnpm check:agents && eslint . --max-warnings 0",
-    "test": "vitest run",
+    "lint": "pnpm check:agents && pnpm check:release && eslint . --max-warnings 0",
+    "test": "pnpm typecheck:tests && vitest run",
     "test:watch": "vitest --typecheck --clearScreen false",
-    "test:coverage": "vitest run --coverage --coverage.reporter=text",
+    "test:coverage": "pnpm typecheck:tests && vitest run --coverage --coverage.reporter=text",
     "generate:llms": "node scripts/generate-llms.mjs",
     "preversion": "pnpm install --frozen-lockfile && pnpm build && pnpm test:coverage && pnpm typecheck && pnpm generate:llms",
     "prepublishOnly": "pnpm install --frozen-lockfile && pnpm build && pnpm typecheck && pnpm lint && pnpm test:coverage",
     "test:package": "node scripts/test-package.mjs",
-    "alpha": "npm version prerelease --preid alpha && npm publish --tag alpha && git push --follow-tags",
-    "release": "npm version patch && npm publish && git push --follow-tags",
     "check:agents": "node -e \"const f=require('node:fs');if(!f.existsSync('AGENTS.md')||f.existsSync('CLAUDE.md')||f.existsSync('.claude'))process.exit(1)\"",
-    "codegen": "pnpm convex codegen --component-dir ./src/component"
+    "codegen": "pnpm convex codegen --component-dir ./src/component",
+    "typecheck:tests": "tsc --noEmit --project tsconfig.test.json",
+    "check:release": "node scripts/check-release.mjs"
   },
   "peerDependencies": {
     "convex": "^1.45.0"

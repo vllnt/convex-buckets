@@ -136,10 +136,7 @@ continuation uses the original document ID, so stale work cannot erase a
 replacement bucket. Return values count only the current batch; completion is
 observed through `get` returning `null`.
 
-`eraseSubject` is a best-effort batched sweep, not a permanent ban or snapshot.
-The host must prevent new joins for that subject while erasing if it needs a
-complete privacy deletion; otherwise later joins may also be swept or survive
-after completion. Orphan memberships are removed safely.
+`eraseSubject` captures the newest matching membership creation time and deletes only that snapshot in bounded batches. Later joins survive stale continuations, including recreation in the same transaction. It is not a permanent ban; hosts remain responsible for deciding whether future joins are allowed.
 
 Multiple mounts are isolated: `app.use(bucketsConfig, { name: "first" })` and
 `app.use(bucketsConfig, { name: "second" })`, accessed through separate
@@ -262,11 +259,7 @@ invocation, not the total. Observe `get === null` for completion.
 
 ### `eraseSubject(ctx, subjectRef, scope?, batch?)` → `number`
 
-Batched best-effort membership sweep, also decrementing counts of remaining
-buckets and tolerating orphan rows. Returns only this batch's deletion count.
-This is not a tombstone or snapshot: hosts needing privacy erasure must stop new
-joins for the subject until cleanup is complete. Concurrent joins can otherwise
-be included in later batches or survive after the last batch.
+Captures the newest matching membership’s `_creationTime` and deletes rows at or below that fixed bound. Continuations retain the original bound; later joins survive. Returns only this batch’s deletion count, not completion of every pending batch. Updates bucket counts and tolerates orphan rows. Convex creation timestamps distinguish sequential inserts even within the same transaction; this is tested on the real local backend. This is a snapshot deletion, not a permanent ban.
 
 Batch sizes and preview limits must be positive safe integers and are clamped to
 their maximum. Invalid refs, capacity, batch and limit produce code-tagged
@@ -693,7 +686,7 @@ import {
   MAX_REF_LENGTH,
 } from "../shared";
 
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
   internalMutation,
@@ -952,42 +945,90 @@ export const continueEraseBucket = internalMutation({
   returns: v.number(),
 });
 
+function subjectMembers(
+  ctx: MutationCtx,
+  ref: { scope: string; subjectRef: string },
+) {
+  return ctx.db
+    .query("members")
+    .withIndex("by_subject", (q) =>
+      q.eq("scope", ref.scope).eq("subjectRef", ref.subjectRef),
+    );
+}
+
 export const eraseSubject = mutation({
   args: {
     batch: v.optional(v.number()),
     scope: v.string(),
     subjectRef: v.string(),
   },
-  handler: async (ctx, arguments_) => {
-    requireRef(arguments_.scope, "scope");
-    requireRef(arguments_.subjectRef, "subjectRef");
-    const batch = parseBatch(arguments_.batch);
-    const memberships = await ctx.db
-      .query("members")
-      .withIndex("by_subject", (q) =>
-        q.eq("scope", arguments_.scope).eq("subjectRef", arguments_.subjectRef),
-      )
-      .take(batch);
-    await Promise.all(
-      memberships.map(async (membership) => {
-        await ctx.db.delete("members", membership._id);
-        const bucket = await findBucket(ctx, membership);
-        if (bucket !== null) {
-          await ctx.db.patch("buckets", bucket._id, {
-            memberCount: Math.max(0, bucket.memberCount - 1),
-          });
-        }
-      }),
-    );
-    if (memberships.length === batch) {
-      await ctx.scheduler.runAfter(0, api.mutations.eraseSubject, {
-        batch,
-        scope: arguments_.scope,
-        subjectRef: arguments_.subjectRef,
-      });
-    }
-    return memberships.length;
+  handler: async (ctx, ref) => {
+    requireRef(ref.scope, "scope");
+    requireRef(ref.subjectRef, "subjectRef");
+    const batch = parseBatch(ref.batch);
+    const newest = await subjectMembers(ctx, ref).order("desc").first();
+    if (newest === null) return 0;
+    return eraseSubjectBatch(ctx, {
+      batch,
+      scope: ref.scope,
+      subjectRef: ref.subjectRef,
+      through: newest._creationTime,
+    });
   },
+  returns: v.number(),
+});
+
+type SubjectBatch = {
+  batch: number;
+  scope: string;
+  subjectRef: string;
+  through: number;
+};
+
+function subjectSnapshot(ctx: MutationCtx, ref: SubjectBatch) {
+  return ctx.db
+    .query("members")
+    .withIndex("by_subject", (q) =>
+      q
+        .eq("scope", ref.scope)
+        .eq("subjectRef", ref.subjectRef)
+        .lte("_creationTime", ref.through),
+    );
+}
+
+async function eraseSubjectBatch(
+  ctx: MutationCtx,
+  ref: SubjectBatch,
+): Promise<number> {
+  const memberships = await subjectSnapshot(ctx, ref).take(ref.batch);
+  await Promise.all(
+    memberships.map(async (membership) => {
+      await ctx.db.delete("members", membership._id);
+      const bucket = await findBucket(ctx, membership);
+      if (bucket !== null)
+        await ctx.db.patch("buckets", bucket._id, {
+          memberCount: Math.max(0, bucket.memberCount - 1),
+        });
+    }),
+  );
+  if (memberships.length === ref.batch) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.mutations.continueEraseSubject,
+      ref,
+    );
+  }
+  return memberships.length;
+}
+
+export const continueEraseSubject = internalMutation({
+  args: {
+    batch: v.number(),
+    scope: v.string(),
+    subjectRef: v.string(),
+    through: v.number(),
+  },
+  handler: async (ctx, ref) => eraseSubjectBatch(ctx, ref),
   returns: v.number(),
 });
 

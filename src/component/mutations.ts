@@ -6,7 +6,7 @@ import {
   MAX_REF_LENGTH,
 } from "../shared";
 
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
   internalMutation,
@@ -265,41 +265,89 @@ export const continueEraseBucket = internalMutation({
   returns: v.number(),
 });
 
+function subjectMembers(
+  ctx: MutationCtx,
+  ref: { scope: string; subjectRef: string },
+) {
+  return ctx.db
+    .query("members")
+    .withIndex("by_subject", (q) =>
+      q.eq("scope", ref.scope).eq("subjectRef", ref.subjectRef),
+    );
+}
+
 export const eraseSubject = mutation({
   args: {
     batch: v.optional(v.number()),
     scope: v.string(),
     subjectRef: v.string(),
   },
-  handler: async (ctx, arguments_) => {
-    requireRef(arguments_.scope, "scope");
-    requireRef(arguments_.subjectRef, "subjectRef");
-    const batch = parseBatch(arguments_.batch);
-    const memberships = await ctx.db
-      .query("members")
-      .withIndex("by_subject", (q) =>
-        q.eq("scope", arguments_.scope).eq("subjectRef", arguments_.subjectRef),
-      )
-      .take(batch);
-    await Promise.all(
-      memberships.map(async (membership) => {
-        await ctx.db.delete("members", membership._id);
-        const bucket = await findBucket(ctx, membership);
-        if (bucket !== null) {
-          await ctx.db.patch("buckets", bucket._id, {
-            memberCount: Math.max(0, bucket.memberCount - 1),
-          });
-        }
-      }),
-    );
-    if (memberships.length === batch) {
-      await ctx.scheduler.runAfter(0, api.mutations.eraseSubject, {
-        batch,
-        scope: arguments_.scope,
-        subjectRef: arguments_.subjectRef,
-      });
-    }
-    return memberships.length;
+  handler: async (ctx, ref) => {
+    requireRef(ref.scope, "scope");
+    requireRef(ref.subjectRef, "subjectRef");
+    const batch = parseBatch(ref.batch);
+    const newest = await subjectMembers(ctx, ref).order("desc").first();
+    if (newest === null) return 0;
+    return eraseSubjectBatch(ctx, {
+      batch,
+      scope: ref.scope,
+      subjectRef: ref.subjectRef,
+      through: newest._creationTime,
+    });
   },
+  returns: v.number(),
+});
+
+type SubjectBatch = {
+  batch: number;
+  scope: string;
+  subjectRef: string;
+  through: number;
+};
+
+function subjectSnapshot(ctx: MutationCtx, ref: SubjectBatch) {
+  return ctx.db
+    .query("members")
+    .withIndex("by_subject", (q) =>
+      q
+        .eq("scope", ref.scope)
+        .eq("subjectRef", ref.subjectRef)
+        .lte("_creationTime", ref.through),
+    );
+}
+
+async function eraseSubjectBatch(
+  ctx: MutationCtx,
+  ref: SubjectBatch,
+): Promise<number> {
+  const memberships = await subjectSnapshot(ctx, ref).take(ref.batch);
+  await Promise.all(
+    memberships.map(async (membership) => {
+      await ctx.db.delete("members", membership._id);
+      const bucket = await findBucket(ctx, membership);
+      if (bucket !== null)
+        await ctx.db.patch("buckets", bucket._id, {
+          memberCount: Math.max(0, bucket.memberCount - 1),
+        });
+    }),
+  );
+  if (memberships.length === ref.batch) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.mutations.continueEraseSubject,
+      ref,
+    );
+  }
+  return memberships.length;
+}
+
+export const continueEraseSubject = internalMutation({
+  args: {
+    batch: v.number(),
+    scope: v.string(),
+    subjectRef: v.string(),
+    through: v.number(),
+  },
+  handler: async (ctx, ref) => eraseSubjectBatch(ctx, ref),
   returns: v.number(),
 });

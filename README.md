@@ -128,10 +128,7 @@ continuation uses the original document ID, so stale work cannot erase a
 replacement bucket. Return values count only the current batch; completion is
 observed through `get` returning `null`.
 
-`eraseSubject` is a best-effort batched sweep, not a permanent ban or snapshot.
-The host must prevent new joins for that subject while erasing if it needs a
-complete privacy deletion; otherwise later joins may also be swept or survive
-after completion. Orphan memberships are removed safely.
+`eraseSubject` captures the newest matching membership creation time and deletes only that snapshot in bounded batches. Later joins survive stale continuations, including recreation in the same transaction. It is not a permanent ban; hosts remain responsible for deciding whether future joins are allowed.
 
 Multiple mounts are isolated: `app.use(bucketsConfig, { name: "first" })` and
 `app.use(bucketsConfig, { name: "second" })`, accessed through separate

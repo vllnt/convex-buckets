@@ -86,3 +86,19 @@ export const openTenant = mutation({
   handler: (ctx, a) => tenant.open(ctx, { bucketRef: a.bucketRef }),
   returns: v.string(),
 });
+
+/** Recreate in the same transaction while the first snapshot still has a queued job. */
+export const snapshotFixture = mutation({
+  args: { bucketRef: v.string() },
+  handler: async (ctx, { bucketRef }) => {
+    await buckets.open(ctx, { bucketRef });
+    await buckets.join(ctx, bucketRef, "snapshot");
+    await buckets.eraseSubject(ctx, "snapshot", undefined, 1);
+    const empty = await buckets.eraseSubject(ctx, "snapshot");
+    if (empty !== 0) throw new Error("snapshot was not empty");
+    await buckets.join(ctx, bucketRef, "snapshot");
+    // eslint-disable-next-line unicorn/no-null -- Convex mutation return validator requires null.
+    return null;
+  },
+  returns: v.null(),
+});

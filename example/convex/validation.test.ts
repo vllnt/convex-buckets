@@ -29,7 +29,7 @@ test.each(["", "x".repeat(257)])(
   },
 );
 
-test("subject sweep is not a ban: recreation after completion survives", async () => {
+test("subject snapshot preserves same-clock recreation across queued jobs", async () => {
   vi.useFakeTimers();
   try {
     const t = convexTest(schema, modules);
@@ -41,10 +41,16 @@ test("subject sweep is not a ban: recreation after completion survives", async (
       scope: "s",
       subjectRef: "a",
     });
+    expect(
+      await t.mutation(api.mutations.eraseSubject, {
+        scope: "s",
+        subjectRef: "a",
+      }),
+    ).toBe(0);
     await t.mutation(api.mutations.join, { ...ref, subjectRef: "a" });
     await t.finishAllScheduledFunctions(vi.runAllTimers);
     const erased = await t.query(api.queries.get, ref);
-    expect(erased?.memberCount).toBe(0);
+    expect(erased?.memberCount).toBe(1);
     await t.mutation(api.mutations.join, { ...ref, subjectRef: "a" });
     const recreated = await t.query(api.queries.get, ref);
     expect(recreated?.memberCount).toBe(1);

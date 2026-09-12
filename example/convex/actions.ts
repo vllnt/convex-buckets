@@ -67,6 +67,12 @@ export const verify = action({
     await ctx.runMutation(api.mutations.eraseBucket, { batch: 1, bucketRef });
     await awaitDeletion(ctx, bucketRef);
     await verifyReplacement(ctx, bucketRef);
+    await ctx.runMutation(api.mutations.snapshotFixture, { bucketRef });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const snapshot = await ctx.runQuery(api.queries.get, { bucketRef });
+    if (snapshot?.memberCount !== 1)
+      throw new Error("snapshot erased recreation");
+    await ctx.runMutation(api.mutations.eraseBucket, { bucketRef });
     const isolated = await ctx.runQuery(components.isolated.queries.get, ref);
     if (isolated?.memberCount !== 1) throw new Error("mount isolation failed");
     await ctx.runMutation(components.isolated.mutations.eraseBucket, ref);

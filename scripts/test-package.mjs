@@ -1,10 +1,22 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 
 const root = process.cwd();
+/** @type {unknown} */
+const metadata = JSON.parse(readFileSync("package.json", "utf8"));
+if (
+  typeof metadata !== "object" ||
+  metadata === null ||
+  !("name" in metadata) ||
+  !("version" in metadata) ||
+  typeof metadata.name !== "string" ||
+  typeof metadata.version !== "string"
+)
+  throw new Error("invalid package metadata");
+const tarball = `${metadata.name.replace("@", "").replace("/", "-")}-${metadata.version}.tgz`;
 const temporary = mkdtempSync(join(tmpdir(), "buckets-consumer-"));
 /** @param {string} command @param {string[]} arguments_ @param {string} [cwd] */
 const run = (command, arguments_, cwd = temporary) =>
@@ -17,7 +29,7 @@ try {
   );
   run("pnpm", [
     "add",
-    join(temporary, "vllnt-convex-buckets-0.1.0.tgz"),
+    join(temporary, tarball),
     "convex@1.45.0",
     "typescript@5.9.3",
     "convex-test@0.0.56",
