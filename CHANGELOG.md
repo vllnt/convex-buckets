@@ -6,7 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-11
+
 ### Added
 
 - First release of `@vllnt/convex-buckets`.
-- `open`, `join`, `leave`, `lock`, `close`, `get`, `listMembers`, `eraseBucket`, `eraseSubject`.
+- `open`, `join`, `leave`, `lock`, `close`, `get`, `listMembers` (bounded),
+  `eraseBucket` / `eraseSubject` (batched).
+- OCC-safe `memberCount` on the bucket row.
