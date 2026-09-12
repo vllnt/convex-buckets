@@ -2,9 +2,11 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import process from "node:process";
 
 const root = process.cwd();
 const temporary = mkdtempSync(join(tmpdir(), "buckets-consumer-"));
+/** @param {string} command @param {string[]} arguments_ @param {string} [cwd] */
 const run = (command, arguments_, cwd = temporary) =>
   execFileSync(command, arguments_, { cwd, stdio: "inherit" });
 try {
@@ -18,6 +20,9 @@ try {
     join(temporary, "vllnt-convex-buckets-0.1.0.tgz"),
     "convex@1.45.0",
     "typescript@5.9.3",
+    "convex-test@0.0.56",
+    "vite@8.2.2",
+    "@types/node@22.20.2",
   ]);
   writeFileSync(
     join(temporary, "consumer.ts"),
@@ -44,6 +49,32 @@ void client; void app;
     "--target",
     "ES2022",
     "consumer.ts",
+  ]);
+  writeFileSync(
+    join(temporary, "registration.ts"),
+    `
+import { register } from "@vllnt/convex-buckets/test";
+import { convexTest } from "convex-test";
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+const host = defineSchema({ unrelated: defineTable({ label: v.string() }) });
+register(convexTest(host, {}), "custom");
+`,
+  );
+  run("pnpm", [
+    "exec",
+    "tsc",
+    "--noEmit",
+    "--strict",
+    "--module",
+    "ESNext",
+    "--moduleResolution",
+    "Bundler",
+    "--target",
+    "ES2022",
+    "--types",
+    "vite/client,node",
+    "registration.ts",
   ]);
   run("node", [
     "--input-type=module",

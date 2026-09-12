@@ -9,17 +9,6 @@ on:
       - "pnpm-lock.yaml"
       - ".github/workflows/publish.yml"
   workflow_dispatch:
-    inputs:
-      bump:
-        description: "Release strategy"
-        required: true
-        default: current
-        type: choice
-        options:
-          - current
-          - patch
-          - minor
-          - major
 
 concurrency:
   group: publish-${{ github.event_name }}
@@ -111,12 +100,8 @@ jobs:
       - name: Prepare version
         id: version
         run: |
-          if [ "${{ inputs.bump }}" = "current" ]; then
-            VERSION=$(node -p "require('./package.json').version")
-          else
-            npm version ${{ inputs.bump }} --no-git-tag-version --ignore-scripts
-            VERSION=$(node -p "require('./package.json').version")
-          fi
+          # Version changes must land through a reviewed, signed PR first.
+          VERSION=$(node -p "require('./package.json').version")
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
@@ -167,12 +152,6 @@ jobs:
           if git rev-parse "refs/tags/v$VERSION" >/dev/null 2>&1; then
             echo "Existing tag: stop for the verified recovery procedure in docs/VERIFICATION.md. Never retag."
             exit 1
-          fi
-
-          if ! git diff --quiet -- package.json; then
-            git add package.json
-            git commit -m "chore(release): v$VERSION"
-            git push origin main
           fi
 
           git tag -a "v$VERSION" -m "v$VERSION"

@@ -18,6 +18,7 @@ test.each(["", "x".repeat(257)])(
     await expect(
       t.query(api.queries.paginateMembers, {
         bucketRef: invalid,
+        // eslint-disable-next-line unicorn/no-null -- Convex serializes null; undefined is not a valid cursor/result.
         paginationOpts: { cursor: null, numItems: 1 },
         scope: "s",
       }),
@@ -42,9 +43,11 @@ test("subject sweep is not a ban: recreation after completion survives", async (
     });
     await t.mutation(api.mutations.join, { ...ref, subjectRef: "a" });
     await t.finishAllScheduledFunctions(vi.runAllTimers);
-    expect((await t.query(api.queries.get, ref))?.memberCount).toBe(0);
+    const erased = await t.query(api.queries.get, ref);
+    expect(erased?.memberCount).toBe(0);
     await t.mutation(api.mutations.join, { ...ref, subjectRef: "a" });
-    expect((await t.query(api.queries.get, ref))?.memberCount).toBe(1);
+    const recreated = await t.query(api.queries.get, ref);
+    expect(recreated?.memberCount).toBe(1);
   } finally {
     vi.useRealTimers();
   }

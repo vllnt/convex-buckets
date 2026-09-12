@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention -- ESLint rule IDs are external names, not camelCase identifiers. */
 import { base } from "@vllnt/eslint-config";
 import convex from "@vllnt/eslint-config/convex";
 import tseslint from "typescript-eslint";

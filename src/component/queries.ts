@@ -24,6 +24,7 @@ export const get = query({
       )
       .unique();
     if (bucket === null) {
+      // eslint-disable-next-line unicorn/no-null -- Convex serializes null; undefined is not a valid cursor/result.
       return null;
     }
     return {
@@ -76,7 +77,7 @@ export const paginateMembers = query({
   }),
 });
 
-/** Bounded preview; use paginateMembers to enumerate a bucket. */
+/** Bounded preview; use paginateMembers to list every member. */
 export const listMembers = query({
   args: {
     bucketRef: v.string(),
