@@ -50,7 +50,8 @@
     "check:agents": "node -e \"const f=require('node:fs');if(!f.existsSync('AGENTS.md')||f.existsSync('CLAUDE.md')||f.existsSync('.claude'))process.exit(1)\"",
     "codegen": "pnpm convex codegen --component-dir ./src/component",
     "typecheck:tests": "tsc --noEmit --project tsconfig.test.json",
-    "check:release": "node scripts/check-release.mjs"
+    "canary:first": "node scripts/publish-first-canary.mjs",
+    "check:release": "node scripts/check-release.mjs && node --test scripts/check-first-canary.mjs"
   },
   "peerDependencies": {
     "convex": "^1.45.0"

@@ -50,7 +50,9 @@ Maintainers only:
 
 Version changes must land in a reviewed, signed PR first. The main-only, opt-in
 `workflow_dispatch` publishes the current reviewed package.json version; it does not bump
-versions or commit onto main. There are no local release/alpha shortcuts. See
+versions or commit onto main. There are no local stable release/alpha shortcuts.
+The explicit [first-canary bootstrap](docs/FIRST_CANARY.md) defaults to dry run
+and cannot publish stable. See
 [recovery and verification](docs/VERIFICATION.md) before any authorized release.
 
 ## Reporting Issues
