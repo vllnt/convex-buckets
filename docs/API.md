@@ -12,8 +12,10 @@ const buckets = new Buckets(components.buckets, { defaultScope: "global" });
 
 ### `open(ctx, { bucketRef?, capacity?, scope? })` → `bucketRef`
 
-Creates an `open` bucket. `capacity` must be a positive safe integer when set.
-Host-supplied `bucketRef` must be unique in the scope (`BUCKET_EXISTS`).
+Creates an `open` bucket. `capacity` must be a positive safe integer when set;
+omitted means no component-level member cap. An omitted `bucketRef` is
+generated. Host-supplied `bucketRef` must be unique in the scope
+(`BUCKET_EXISTS`).
 
 ### `join(ctx, bucketRef, subjectRef, scope?)`
 
@@ -34,7 +36,9 @@ member.
 
 ### `get(ctx, bucketRef, scope?)`
 
-Bucket state including `memberCount`, or `null`.
+`{ bucketRef, status, memberCount, openedAt, capacity?, lockedAt?, closedAt? }`,
+or `null`. Status is `"open" | "locked" | "closed"`; timestamps are
+milliseconds.
 
 ### `listMembers(ctx, bucketRef, scope?, limit?)`
 
@@ -60,19 +64,20 @@ invocation, not the total. Observe `get === null` for completion.
 
 ### `eraseSubject(ctx, subjectRef, scope?, batch?)` → `number`
 
-Deletes at most `batch` memberships (default 200, max 500), updates bucket counts,
-and tolerates orphan rows. Returns the number deleted in this invocation.
-**Does not schedule a continuation.** The host blocks new joins while repeatedly
-calling this method until it returns zero; it may then permit rejoining without
-latent subject-erasure jobs. Zero is an observation, not a permanent ban or a
-concurrent-write fence.
+Deletes at most `batch` memberships (default 200, max 500), updates bucket
+counts, and tolerates orphan rows. Returns the number deleted in this
+invocation. **Does not schedule a continuation.** The host blocks new joins
+while repeatedly calling this method until it returns zero; it may then permit
+rejoining without latent subject-erasure jobs. Zero is an observation, not a
+permanent ban or a concurrent-write fence.
 
 This replaces the unpublished preview's automatic subject sweep. Callers must
-now drive additional batches. No ordering or uniqueness guarantee is assumed
-for `_creationTime`; it is not a safe generation boundary.
+now drive additional batches. No ordering or uniqueness guarantee is assumed for
+`_creationTime`; it is not a safe generation boundary.
 
 Batch sizes and preview limits must be positive safe integers and are clamped to
 their maximum. Invalid refs, capacity, batch and limit produce code-tagged
 `ConvexError`s (`INVALID_REF`, `INVALID_CAPACITY`, `INVALID_BATCH`,
 `INVALID_LIMIT`). Scope, bucket and subject refs enforce 1..256 characters,
-including reads. The host must authorize scope; it is not an access-control boundary.
+including reads. The host must authorize scope; it is not an access-control
+boundary.
