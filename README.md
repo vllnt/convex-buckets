@@ -9,8 +9,8 @@
 
 Ephemeral groups of opaque `subjectRef`s — matches, lobbies, cohorts.
 
-Unreleased private preview; the installation command below describes the planned
-package.
+Public canary releases are available; publication does not imply production
+readiness.
 
 Not standing orgs (`@vllnt/convex-memberships`), not liveness
 (`@convex-dev/presence`).
@@ -34,17 +34,19 @@ Lifecycle: `open` → `locked` (no new joins) → `closed` (terminal).
 - **Leave** while `open` or `locked`, not after `close`.
 - **Pagination** — `paginateMembers` returns a cursor and completion flag;
   `listMembers` is only a bounded preview (default 100, max 500).
-- **Bounded erase** — `eraseBucket` reschedules fenced batches;
-  `eraseSubject` deletes one batch per call, without background subject sweeps.
+- **Bounded erase** — `eraseBucket` reschedules fenced batches; `eraseSubject`
+  deletes one batch per call, without background subject sweeps.
 - **Scopes** — default `"global"`.
 
 ## Installation
 
 ```bash
-pnpm add @vllnt/convex-buckets
+pnpm add @vllnt/convex-buckets@canary
 ```
 
-Peer dependency: `convex@^1.45.0`.
+Node.js >=20.19.0; required peer: `convex@^1.45.0`. This guide follows the
+public `canary` channel. The npm `latest` tag also currently points to a
+prerelease, not a stable release.
 
 ## Usage
 
@@ -78,6 +80,26 @@ export const startMatch = mutation({
   },
 });
 ```
+
+After mounting, run `pnpm convex dev` to generate the host's component
+references. Replace the sample identity with an authenticated, authorized host
+identity.
+
+## Configuration and limits
+
+`new Buckets(component, { defaultScope: "global" })` sets the sole client
+option. `open` accepts `{ bucketRef?, capacity?, scope? }`: omit the ref to
+generate one, omit capacity for no component-level member cap. A supplied
+capacity must be a positive safe integer; refs/scopes must contain 1–256 UTF-16
+code units.
+
+`get` returns
+`{ bucketRef, status, memberCount, openedAt, capacity?, lockedAt?, closedAt? }`
+or `null`. Member results are `{ subjectRef, joinedAt }`. Preview limits default
+to 100 and clamp to 500; pagination requires integer `numItems` in 1–500.
+Erasure batches default to 200 and clamp to 500. There is no expiry timer,
+presence heartbeat or standing-role model; the host owns lifecycle decisions and
+may compose official presence separately.
 
 ## API Reference
 
@@ -129,9 +151,10 @@ replacement bucket. Return values count only the current batch; completion is
 observed through `get` returning `null`.
 
 `eraseSubject` deletes one bounded batch per call and schedules no continuation.
-Block new joins while draining, repeat until it returns zero, then permit joins if
-appropriate. A returned zero is only an observation of current membership, not a
-permanent ban. No queued subject sweep can later remove a recreated membership.
+Block new joins while draining, repeat until it returns zero, then permit joins
+if appropriate. A returned zero is only an observation of current membership,
+not a permanent ban. No queued subject sweep can later remove a recreated
+membership.
 
 Multiple mounts are isolated: `app.use(bucketsConfig, { name: "first" })` and
 `app.use(bucketsConfig, { name: "second" })`, accessed through separate

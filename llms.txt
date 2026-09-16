@@ -2,7 +2,8 @@
 
 > Ephemeral groups of opaque subject refs as a Convex component
 
-`@vllnt/convex-buckets` is an unpublished private-preview Convex component. It targets `convex@^1.45.0`.
+`@vllnt/convex-buckets` is a public canary Convex component. Install `@vllnt/convex-buckets@canary`;
+the npm `latest` tag also currently points to a prerelease. It targets `convex@^1.45.0`.
 It stores two sandboxed tables — `buckets` (`bucketRef`, `status` open/locked/closed, `capacity`,
 `memberCount`, timestamps) and `members` (`bucketRef`, `subjectRef`, `joinedAt`). `open` creates a
 group; `join` / `leave` mutate membership; `lock` stops joins; `close` is terminal. Capacity is
@@ -12,6 +13,13 @@ OCC-safe because `join` patches `memberCount` on the bucket row. `listMembers` i
 continuations are fenced by document ID. `eraseSubject` deletes one bounded batch per call and schedules no continuation: the host blocks joins and repeats calls until zero. It is not a permanent ban. The host
 owns auth and the meaning of the group. Distinct from `@vllnt/convex-memberships` (standing
 org/roles) and `@convex-dev/presence` (liveness).
+
+Client option `defaultScope` defaults to `"global"`. `open` options are
+`{ bucketRef?, capacity?, scope? }`; omitted refs are generated, omitted capacity
+means no component-level member cap. `get` returns `{ bucketRef, status,
+memberCount, openedAt, capacity?, lockedAt?, closedAt? }` or null. Erasure batches
+default to 200 and clamp to 500. Named mounts isolate state and scheduled work.
+No automatic expiry, React entry or heartbeat is provided.
 
 ## Docs
 
@@ -32,4 +40,3 @@ org/roles) and `@convex-dev/presence` (liveness).
 - [Security Policy](SECURITY.md): Vulnerability reporting policy
 - [Code of Conduct](CODE_OF_CONDUCT.md): Community participation guidelines
 - [License](LICENSE): MIT license
-- [Full source bundle](llms-full.txt): Aggregated README, changelog, API docs, and key source files
