@@ -1,6 +1,8 @@
 # Publication audit evidence
 
-This is an unpublished preview, not a readiness approval.
+This records the pre-publication audit, not a readiness approval. Public canaries
+are now available; the observations below describe the historical audit rather
+than checks rerun for every release.
 
 ## Reproduce
 
