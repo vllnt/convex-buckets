@@ -54,3 +54,52 @@ test("subject batches leave no scheduled work that could erase recreation", asyn
   const recreated = await t.query(api.queries.get, ref);
   expect(recreated?.memberCount).toBe(1);
 });
+
+test.each([
+  Number.NaN,
+  Number.POSITIVE_INFINITY,
+  Number.NEGATIVE_INFINITY,
+  -1,
+  0,
+  1.5,
+])("rejects non-positive-integer capacity, batch and limit %s", async (bad) => {
+  const t = convexTest(schema, modules);
+  const ref = { bucketRef: "b", scope: "s" };
+  await t.mutation(api.mutations.open, ref);
+  await expect(
+    t.mutation(api.mutations.open, { capacity: bad, scope: "s" }),
+  ).rejects.toThrow("INVALID_CAPACITY");
+  await expect(
+    t.mutation(api.mutations.eraseBucket, { ...ref, batch: bad }),
+  ).rejects.toThrow("INVALID_BATCH");
+  await expect(
+    t.mutation(api.mutations.eraseSubject, {
+      batch: bad,
+      scope: "s",
+      subjectRef: "a",
+    }),
+  ).rejects.toThrow("INVALID_BATCH");
+  await expect(
+    t.query(api.queries.listMembers, { ...ref, limit: bad }),
+  ).rejects.toThrow("INVALID_LIMIT");
+});
+
+test("concurrent joins never exceed capacity or duplicate a subject", async () => {
+  const t = convexTest(schema, modules);
+  const ref = { bucketRef: "b", scope: "s" };
+  await t.mutation(api.mutations.open, { ...ref, capacity: 2 });
+  const results = await Promise.all(
+    ["a", "b", "c", "d", "a"].map((subjectRef) =>
+      t.mutation(api.mutations.join, { ...ref, subjectRef }),
+    ),
+  );
+  expect(results.filter((result) => result.joined)).toHaveLength(2);
+  const members = await t.query(api.queries.listMembers, ref);
+  expect(new Set(members.map((member) => member.subjectRef)).size).toBe(
+    members.length,
+  );
+  expect(await t.query(api.queries.get, ref)).toMatchObject({
+    memberCount: members.length,
+  });
+  expect(members).toHaveLength(2);
+});
