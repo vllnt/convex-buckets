@@ -1,43 +1,97 @@
 # Publication audit evidence
 
-This records the pre-publication audit, not a readiness approval. Public canaries
-are now available; the observations below describe the historical audit rather
-than checks rerun for every release.
+This records the pre-publication audit, not a readiness approval. Public
+canaries are now available; the observations below describe the historical audit
+rather than checks rerun for every release.
 
 ## Reproduce
 
 - `pnpm install --frozen-lockfile`
 - `pnpm build && pnpm typecheck && pnpm typecheck:ci && pnpm lint`
-- `pnpm test:coverage` — 100% statements, branches, functions and lines required.
-- `pnpm test:package` — packs locally, installs in a temporary independent consumer, checks strict NodeNext types (without skipLibCheck), runtime exports, and the source test helper against an unrelated host schema under Bundler resolution. No publish command is run.
-- With an isolated writable HOME: `CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --local-backend-version precompiled-2026-09-11-157eb19 --local-cloud-port 3330 --local-site-port 3331 --typecheck disable --run actions:verify`.
+- `pnpm test:coverage` — 100% statements, branches, functions and lines
+  required.
+- `pnpm test:package` — packs locally, installs in a temporary independent
+  consumer, checks strict NodeNext types (without skipLibCheck), runtime
+  exports, and the source test helper against an unrelated host schema under
+  Bundler resolution. No publish command is run.
+- With an isolated writable HOME:
+  `CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --local-backend-version precompiled-2026-09-11-157eb19 --local-cloud-port 3330 --local-site-port 3331 --typecheck disable --run actions:verify`.
 
-Observed on Darwin arm64, Node 26.7.0, Convex 1.45.0: real local action returned `{ admitted: 3, schedulerDrained: true }` for 12 simultaneous join calls against capacity 3 followed by batch-size-1 scheduled deletion. CLI generated the checked-in bindings. This checks actual transactions and scheduler execution, not every possible interleaving. The action issues `ctx.runMutation` promises together, avoiding an HTTP client mutation queue, but does not measure server-side overlap or OCC retry counts; the result alone is not measured-contention proof. Unit tests additionally replay stale deletion jobs after ref reuse and verify pagination and orphan cleanup.
+Observed on Darwin arm64, Node 26.7.0, Convex 1.45.0: real local action returned
+`{ admitted: 3, schedulerDrained: true }` for 12 simultaneous join calls against
+capacity 3 followed by batch-size-1 scheduled deletion. CLI generated the
+checked-in bindings. This checks actual transactions and scheduler execution,
+not every possible interleaving. The action issues `ctx.runMutation` promises
+together, avoiding an HTTP client mutation queue, but does not measure
+server-side overlap or OCC retry counts; the result alone is not
+measured-contention proof. Unit tests additionally replay stale deletion jobs
+after ref reuse and verify pagination and orphan cleanup.
 
-The harness managed-process tool returned `TASK_PROCESS_HOST_UNAVAILABLE`; the local backend check used bounded blocking `dev --once` instead. No cloud deployment or credential access was used. The first standalone `pnpm codegen` failed without a deployment; anonymous local `dev` subsequently generated bindings successfully.
+The harness managed-process tool returned `TASK_PROCESS_HOST_UNAVAILABLE`; the
+local backend check used bounded blocking `dev --once` instead. No cloud
+deployment or credential access was used. The first standalone `pnpm codegen`
+failed without a deployment; anonymous local `dev` subsequently generated
+bindings successfully.
 
 ## Offline backend preparation
 
-Pin `--local-backend-version precompiled-2026-09-11-157eb19` to avoid a version lookup. If the isolated HOME lacks the binary, copy only a trusted cached `convex-local-backend` executable into `$HOME/.cache/convex/binaries/precompiled-2026-09-11-157eb19/convex-local-backend` and preserve executable permissions. This audit found that binary at `/tmp/progression-audit-home/.cache/convex/binaries/precompiled-2026-09-11-157eb19/convex-local-backend` (an ephemeral machine-local cache, not a portable prerequisite). Never copy deployment instance data, credentials, environment files, or identity configuration. Offline execution also requires already-installed package dependencies. A fresh machine without those caches requires network access to obtain the public tooling.
+Pin `--local-backend-version precompiled-2026-09-11-157eb19` to avoid a version
+lookup. If the isolated HOME lacks the binary, copy only a trusted cached
+`convex-local-backend` executable into
+`$HOME/.cache/convex/binaries/precompiled-2026-09-11-157eb19/convex-local-backend`
+and preserve executable permissions. This audit found that binary at
+`/tmp/progression-audit-home/.cache/convex/binaries/precompiled-2026-09-11-157eb19/convex-local-backend`
+(an ephemeral machine-local cache, not a portable prerequisite). Never copy
+deployment instance data, credentials, environment files, or identity
+configuration. Offline execution also requires already-installed package
+dependencies. A fresh machine without those caches requires network access to
+obtain the public tooling.
 
 ## Remaining limitations / review requirements
 
-- Package AGENTS now links official component authoring guidance; the absent generated guidance link was removed without fabricating generated files.
-- `eraseSubject` is caller-driven: one bounded batch and no scheduled continuation.
-  Unit tests assert an empty scheduler after exact-batch erasure; the real-backend
-  fixture drains and rejoins in one transaction. No fixed sleep is used as proof
-  of subject-job execution. `_creationTime` is not assumed unique or monotonic:
+- Package AGENTS now links official component authoring guidance; the absent
+  generated guidance link was removed without fabricating generated files.
+- `eraseSubject` is caller-driven: one bounded batch and no scheduled
+  continuation. Unit tests assert an empty scheduler after exact-batch erasure;
+  the real-backend fixture drains and rejoins in one transaction. No fixed sleep
+  is used as proof of subject-job execution. `_creationTime` is not assumed
+  unique or monotonic:
   [Convex guidance](https://discord-questions.convex.dev/m/1273715538555699261).
   This replaces the unpublished automatic subject-sweep contract.
-- Scope, bucket and subject refs are bounded to 1..256 characters in reads and writes; capacity, batch sizes and list sizes reject unsafe integers.
-- The actual runtime check now mounts a second independent instance, inserts the same bucket ref, and verifies first-mount cleanup leaves the second mount intact.
-- Node 20.19.0 was verified with `pnpm dlx node@20.19.0 node_modules/vitest/vitest.mjs run --coverage`: 26 tests passed, 100% across all four coverage metrics. The actual backend CLI run used Node 26.
-- Review of the frozen final diff and independent verification are still required before publication readiness. No push, merge, release, or publish has been performed by this audit.
+- Scope, bucket and subject refs are bounded to 1..256 characters in reads and
+  writes; capacity, batch sizes and list sizes reject unsafe integers.
+- The actual runtime check now mounts a second independent instance, inserts the
+  same bucket ref, and verifies first-mount cleanup leaves the second mount
+  intact.
+- Node 20.19.0 was verified with
+  `pnpm dlx node@20.19.0 node_modules/vitest/vitest.mjs run --coverage`: 26
+  tests passed, 100% across all four coverage metrics. The actual backend CLI
+  run used Node 26.
+- Review of the frozen final diff and independent verification are still
+  required before publication readiness. No push, merge, release, or publish has
+  been performed by this audit.
 
 ## Strict-lint rework verified
 
-The initial lint evidence applied only the component preset and excluded examples. The corrected configuration includes the typed base preset, clients, shared code, examples and scripts and passes with zero warnings. Explicit action return typing breaks the generated API inference cycle; indexed lookup helpers keep transaction bodies coherent; tests are split into focused scenarios. Exceptions are limited to external ESLint rule IDs, the existing four-parameter public client signatures, and Convex-required null cursors/results. No safety-rule or coverage exemptions were added. Coverage includes `src/test.ts`, unrelated host-schema registration and every module loader. All four coverage metrics pass at 100%.
+The initial lint evidence applied only the component preset and excluded
+examples. The corrected configuration includes the typed base preset, clients,
+shared code, examples and scripts and passes with zero warnings. Explicit action
+return typing breaks the generated API inference cycle; indexed lookup helpers
+keep transaction bodies coherent; tests are split into focused scenarios.
+Exceptions are limited to external ESLint rule IDs, the existing four-parameter
+public client signatures, and Convex-required null cursors/results. No
+safety-rule or coverage exemptions were added. Coverage includes `src/test.ts`,
+unrelated host-schema registration and every module loader. All four coverage
+metrics pass at 100%.
 
 ## Interrupted stable-release recovery
 
-Stable releases are published only by the tag-triggered workflow: a pushed `vX.Y.Z` tag whose commit is on `main` and matches `package.json` and `CHANGELOG.md`. Version bumps land through a reviewed PR, never an automated commit onto protected main. The npm publish step skips versions that already exist, so a failed run can be re-run after fixing the cause (for example, the GitHub release step). Never move or delete a pushed tag and never bump another version to hide an uncertain partial release. If npm holds a version whose tarball differs from the tagged commit, stop and verify integrity before doing anything else.
+Stable releases are published only by the tag-triggered workflow: a pushed
+`vX.Y.Z` tag whose commit is on `main` and matches `package.json` and
+`CHANGELOG.md`. Version bumps land through a reviewed PR, never an automated
+commit onto protected main. The npm publish step skips versions that already
+exist, so a failed run can be re-run after fixing the cause (for example, the
+GitHub release step). Never move or delete a pushed tag and never bump another
+version to hide an uncertain partial release. If npm holds a version whose
+tarball differs from the tagged commit, stop and verify integrity before doing
+anything else.
