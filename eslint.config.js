@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention -- ESLint rule IDs are external names, not camelCase identifiers. */
 import { base } from "@vllnt/eslint-config";
 import convex from "@vllnt/eslint-config/convex";
-import tseslint from "typescript-eslint";
 
 export default [
   { ignores: ["dist/**", "**/_generated/**", "coverage/**"] },
@@ -16,9 +15,6 @@ export default [
   {
     files: ["src/component/**/*.ts"],
     ignores: ["src/component/_generated/**"],
-    languageOptions: {
-      parser: tseslint.parser,
-    },
     rules: {
       "convex-rules/namespace-separation": "error",
       "convex-rules/no-bare-v-any": "error",
