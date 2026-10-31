@@ -25,7 +25,16 @@ try {
   run("pnpm", ["pack", "--pack-destination", temporary], root);
   writeFileSync(
     join(temporary, "package.json"),
-    JSON.stringify({ private: true, type: "module" }),
+    JSON.stringify({
+      pnpm: { ignoredBuiltDependencies: ["esbuild"] },
+      private: true,
+      type: "module",
+    }),
+  );
+  // pnpm 11 reads the build-script policy from the workspace file, pnpm 10 from package.json.
+  writeFileSync(
+    join(temporary, "pnpm-workspace.yaml"),
+    "allowBuilds:\n  esbuild: false\n",
   );
   run("pnpm", [
     "add",
@@ -86,6 +95,22 @@ register(convexTest(host, {}), "custom");
     "ES2022",
     "--types",
     "vite/client,node",
+    "registration.ts",
+  ]);
+  // The shipped test helper is TypeScript source: it must also compile for NodeNext consumers.
+  run("pnpm", [
+    "exec",
+    "tsc",
+    "--noEmit",
+    "--strict",
+    "--module",
+    "NodeNext",
+    "--moduleResolution",
+    "NodeNext",
+    "--target",
+    "ES2022",
+    "--types",
+    "node",
     "registration.ts",
   ]);
   run("node", [

@@ -1,10 +1,14 @@
 import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 
-import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, MAX_REF_LENGTH } from "../shared";
+import {
+  DEFAULT_LIST_LIMIT,
+  MAX_LIST_LIMIT,
+  MAX_REF_LENGTH,
+} from "../shared.js";
 
-import { query } from "./_generated/server";
-import { bucketState, memberState } from "./validators";
+import { query } from "./_generated/server.js";
+import { bucketState, memberState } from "./validators.js";
 
 function fail(code: string, message: string): never {
   throw new ConvexError({ code, message });

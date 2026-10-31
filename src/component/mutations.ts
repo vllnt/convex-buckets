@@ -4,15 +4,15 @@ import {
   DEFAULT_ERASE_BATCH,
   MAX_ERASE_BATCH,
   MAX_REF_LENGTH,
-} from "../shared";
+} from "../shared.js";
 
-import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api.js";
+import type { Id } from "./_generated/dataModel.js";
 import {
   internalMutation,
   mutation,
   type MutationCtx,
-} from "./_generated/server";
+} from "./_generated/server.js";
 
 function findBucket(
   ctx: MutationCtx,

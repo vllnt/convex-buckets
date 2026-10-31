@@ -2,8 +2,8 @@
 
 > Ephemeral groups of opaque subject refs as a Convex component
 
-`@vllnt/convex-buckets` is a public canary Convex component. Install `@vllnt/convex-buckets@canary`;
-the npm `latest` tag also currently points to a prerelease. It targets `convex@^1.45.0`.
+`@vllnt/convex-buckets` is a Convex component. Install `@vllnt/convex-buckets`
+(pre-release builds from `main` use the `canary` dist-tag). It targets `convex@^1.45.0`.
 It stores two sandboxed tables — `buckets` (`bucketRef`, `status` open/locked/closed, `capacity`,
 `memberCount`, timestamps) and `members` (`bucketRef`, `subjectRef`, `joinedAt`). `open` creates a
 group; `join` / `leave` mutate membership; `lock` stops joins; `close` is terminal. Capacity is

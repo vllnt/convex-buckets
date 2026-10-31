@@ -1,7 +1,9 @@
+/// <reference types="vite/client" />
+
 import type { GenericSchema, SchemaDefinition } from "convex/server";
 import type { TestConvex } from "convex-test";
 
-import schema from "./component/schema";
+import schema from "./component/schema.js";
 
 const modules = import.meta.glob("./component/**/*.ts");
 
