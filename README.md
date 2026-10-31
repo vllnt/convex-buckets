@@ -9,9 +9,6 @@
 
 Ephemeral groups of opaque `subjectRef`s — matches, lobbies, cohorts.
 
-Public canary releases are available; publication does not imply production
-readiness.
-
 Not standing orgs (`@vllnt/convex-memberships`), not liveness
 (`@convex-dev/presence`).
 
@@ -41,12 +38,12 @@ Lifecycle: `open` → `locked` (no new joins) → `closed` (terminal).
 ## Installation
 
 ```bash
-pnpm add @vllnt/convex-buckets@canary
+pnpm add @vllnt/convex-buckets
 ```
 
-Node.js >=20.19.0; required peer: `convex@^1.45.0`. This guide follows the
-public `canary` channel. The npm `latest` tag also currently points to a
-prerelease, not a stable release.
+Node.js >=20.19.0; required peer: `convex@^1.45.0`. Pre-release builds from
+`main` are published under the `canary` dist-tag
+(`pnpm add @vllnt/convex-buckets@canary`).
 
 ## Usage
 
@@ -141,6 +138,22 @@ capacity admission and scheduled cleanup on a real local Convex backend. Run
 with an isolated HOME and
 `CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --local-cloud-port 3330 --local-site-port 3331 --run actions:verify`.
 This is targeted evidence, not proof of every concurrency interleaving.
+
+### Testing your app
+
+`@vllnt/convex-buckets/test` exports `register(t, name = "buckets")` to mount
+the component in a `convex-test` instance. It needs `convex-test` and `vitest`
+(with Vite's `import.meta.glob`) in the consuming app:
+
+```ts
+/// <reference types="vite/client" />
+import { convexTest } from "convex-test";
+import { register } from "@vllnt/convex-buckets/test";
+import schema from "./schema";
+
+const t = convexTest(schema, import.meta.glob("./**/*.ts"));
+register(t);
+```
 
 ## Cleanup and isolation
 
