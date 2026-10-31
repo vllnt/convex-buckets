@@ -2,8 +2,6 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    // Shared dev hosts: keep test parallelism low.
-    maxWorkers: 2,
     coverage: {
       include: [
         "src/shared.ts",
@@ -24,6 +22,8 @@ export default defineConfig({
     },
     environment: "edge-runtime",
     exclude: ["**/node_modules/**", "dist/**"],
+    // Shared dev hosts: keep test parallelism low.
+    maxWorkers: 2,
     typecheck: {
       tsconfig: "./tsconfig.test.json",
     },
