@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- ESLint rule IDs are external names, not camelCase identifiers. */
 import { base } from "@vllnt/eslint-config";
 import convex from "@vllnt/eslint-config/convex";
 
@@ -36,5 +35,20 @@ export default [
       "convex-rules/namespace-separation": "off",
       "convex-rules/standard-filenames": "off",
     },
+  },
+  // Rule IDs in this file are external names, not camelCase identifiers.
+  {
+    files: ["eslint.config.js"],
+    rules: { "@typescript-eslint/naming-convention": "off" },
+  },
+  // Positional client methods match the sibling stable components.
+  {
+    files: ["src/client/index.ts"],
+    rules: { "max-params": "off" },
+  },
+  // Convex requires null for absent results and first-page cursors.
+  {
+    files: ["src/component/queries.ts", "example/**"],
+    rules: { "unicorn/no-null": "off" },
   },
 ];
