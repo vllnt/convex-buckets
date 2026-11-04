@@ -41,9 +41,9 @@ Lifecycle: `open` → `locked` (no new joins) → `closed` (terminal).
 pnpm add @vllnt/convex-buckets
 ```
 
-Node.js >=20.19.0; required peer: `convex@^1.45.0`. Pre-release builds from
-`main` are published under the `canary` dist-tag
-(`pnpm add @vllnt/convex-buckets@canary`).
+Node.js >=20.19.0; required peer: `convex@^1.45.0`. Stable releases are
+published to the `latest` dist-tag with npm provenance. Unreleased builds from
+`main` go to the `canary` dist-tag (`pnpm add @vllnt/convex-buckets@canary`).
 
 ## Usage
 
@@ -57,30 +57,91 @@ app.use(bucketsConfig);
 export default app;
 ```
 
+The component never reads your auth or tables. Wrap it in host functions that
+authenticate the caller, decide what they may do, and pass the result in:
+
 ```ts
-import { v } from "convex/values";
-import { components } from "./_generated/api";
-import { mutation } from "./_generated/server";
+// convex/matches.ts
+import { paginationOptsValidator, type Auth } from "convex/server";
+import { ConvexError, v } from "convex/values";
 import { Buckets } from "@vllnt/convex-buckets";
+import { components } from "./_generated/api";
+import { mutation, query } from "./_generated/server";
 
 const buckets = new Buckets(components.buckets);
+
+// The host derives the subjectRef; never accept it from the client.
+async function requireSubject(ctx: { auth: Auth }): Promise<string> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (identity === null) throw new ConvexError("unauthenticated");
+  return identity.tokenIdentifier;
+}
 
 export const startMatch = mutation({
   args: {},
   returns: v.string(),
   handler: async (ctx) => {
-    const subjectRef = /* host-resolved identity */ "user_1";
+    const subjectRef = await requireSubject(ctx);
     const id = await buckets.open(ctx, { capacity: 4 });
-    const joined = await buckets.join(ctx, id, subjectRef);
-    if (!joined.joined) throw new Error(joined.reason ?? "join failed");
+    const result = await buckets.join(ctx, id, subjectRef);
+    if (!result.joined) throw new ConvexError(result.reason ?? "join failed");
     return id;
+  },
+});
+
+export const joinMatch = mutation({
+  args: { bucketRef: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, { bucketRef }) => {
+    const subjectRef = await requireSubject(ctx);
+    // Host-side authorization (invite, friendship, ...) goes here.
+    const result = await buckets.join(ctx, bucketRef, subjectRef);
+    return result.joined;
+  },
+});
+
+export const matchState = query({
+  args: { bucketRef: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      bucketRef: v.string(),
+      capacity: v.optional(v.number()),
+      closedAt: v.optional(v.number()),
+      lockedAt: v.optional(v.number()),
+      memberCount: v.number(),
+      openedAt: v.number(),
+      status: v.union(
+        v.literal("open"),
+        v.literal("locked"),
+        v.literal("closed"),
+      ),
+    }),
+  ),
+  handler: async (ctx, { bucketRef }) => {
+    await requireSubject(ctx);
+    return buckets.get(ctx, bucketRef);
+  },
+});
+
+export const matchMembers = query({
+  args: { bucketRef: v.string(), paginationOpts: paginationOptsValidator },
+  returns: v.object({
+    continueCursor: v.string(),
+    isDone: v.boolean(),
+    page: v.array(v.object({ joinedAt: v.number(), subjectRef: v.string() })),
+  }),
+  handler: async (ctx, { bucketRef, paginationOpts }) => {
+    await requireSubject(ctx);
+    return buckets.paginateMembers(ctx, bucketRef, paginationOpts);
   },
 });
 ```
 
 After mounting, run `pnpm convex dev` to generate the host's component
-references. Replace the sample identity with an authenticated, authorized host
-identity.
+references. Component errors are `ConvexError`s carrying a `code`
+(`INVALID_REF`, `INVALID_CAPACITY`, `INVALID_BATCH`, `INVALID_LIMIT`,
+`BUCKET_EXISTS`); see [docs/API.md](docs/API.md).
 
 ## Configuration and limits
 
