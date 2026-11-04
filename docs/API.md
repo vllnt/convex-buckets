@@ -71,13 +71,12 @@ while repeatedly calling this method until it returns zero; it may then permit
 rejoining without latent subject-erasure jobs. Zero is an observation, not a
 permanent ban or a concurrent-write fence.
 
-This replaces the unpublished preview's automatic subject sweep. Callers must
-now drive additional batches. No ordering or uniqueness guarantee is assumed for
-`_creationTime`; it is not a safe generation boundary.
+Callers drive additional batches. No ordering or uniqueness guarantee is assumed
+for `_creationTime`; it is not a safe generation boundary.
 
 Batch sizes and preview limits must be positive safe integers and are clamped to
 their maximum. Invalid refs, capacity, batch and limit produce code-tagged
-`ConvexError`s (`INVALID_REF`, `INVALID_CAPACITY`, `INVALID_BATCH`,
-`INVALID_LIMIT`). Scope, bucket and subject refs enforce 1..256 characters,
-including reads. The host must authorize scope; it is not an access-control
-boundary.
+`ConvexError`s whose `data` is `{ code, message }` (`INVALID_REF`,
+`INVALID_CAPACITY`, `INVALID_BATCH`, `INVALID_LIMIT`). Scope, bucket and subject
+refs enforce 1..256 characters, including reads. The host must authorize scope;
+it is not an access-control boundary.
