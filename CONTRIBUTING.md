@@ -59,6 +59,12 @@ trusted publishing and provenance; nothing is published from a local machine.
   matching `## [X.Y.Z]` entry to `CHANGELOG.md`, then push the tag `vX.Y.Z` on
   that `main` commit.
 
+If a stable run fails after the npm publish step, re-run it after fixing the
+cause: the publish step skips versions that already exist. Never move or delete
+a pushed tag, and never bump the version to hide a partial release. If npm holds
+a version whose tarball differs from the tagged commit, stop and verify
+integrity first.
+
 ## Reporting Issues
 
 Use [GitHub Issues](https://github.com/vllnt/convex-buckets/issues). For
