@@ -31,7 +31,9 @@ test("cleanup closes immediately and counts remaining rows", async () => {
     expect(
       await t.mutation(api.mutations.join, { ...ref, subjectRef: "d" }),
     ).toEqual({ joined: false, reason: "closed" });
-    await expect(t.mutation(api.mutations.open, ref)).rejects.toThrow();
+    await expect(t.mutation(api.mutations.open, ref)).rejects.toThrow(
+      "BUCKET_EXISTS",
+    );
     await t.finishAllScheduledFunctions(vi.runAllTimers);
   } finally {
     vi.useRealTimers();
@@ -89,7 +91,6 @@ test("pagination traverses every member", async () => {
   const t = await populated();
   const first = await t.query(api.queries.paginateMembers, {
     ...ref,
-    // eslint-disable-next-line unicorn/no-null -- Convex requires null for the first cursor.
     paginationOpts: { cursor: null, numItems: 2 },
   });
   const last = await t.query(api.queries.paginateMembers, {
@@ -110,7 +111,6 @@ test.each([0, 1.5, 501])(
     await expect(
       t.query(api.queries.paginateMembers, {
         ...ref,
-        // eslint-disable-next-line unicorn/no-null -- Convex requires null for the first cursor.
         paginationOpts: { cursor: null, numItems: numberItems },
       }),
     ).rejects.toThrow("INVALID_LIMIT");

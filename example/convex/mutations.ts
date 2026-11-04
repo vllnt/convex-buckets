@@ -98,7 +98,6 @@ export const subjectEraseFixture = mutation({
     if (removed !== 1 || empty !== 0)
       throw new Error("subject batch did not drain");
     await buckets.join(ctx, bucketRef, "subject");
-    // eslint-disable-next-line unicorn/no-null -- Convex mutation return validator requires null.
     return null;
   },
   returns: v.null(),

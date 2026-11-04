@@ -28,7 +28,6 @@ export const get = query({
       )
       .unique();
     if (bucket === null) {
-      // eslint-disable-next-line unicorn/no-null -- Convex serializes null; undefined is not a valid cursor/result.
       return null;
     }
     return {
