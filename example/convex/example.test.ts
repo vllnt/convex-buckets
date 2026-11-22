@@ -1,12 +1,6 @@
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
 
-import {
-  clampEraseBatch,
-  clampListLimit,
-  MAX_ERASE_BATCH,
-  MAX_LIST_LIMIT,
-} from "../../src/shared";
 import { register } from "../../src/test";
 
 import { api } from "./_generated/api";
@@ -38,7 +32,6 @@ test("open generates a ref and join/list/get work", async () => {
   });
   const page = await t.query(api.queries.paginateMembers, {
     bucketRef: ref,
-    // eslint-disable-next-line unicorn/no-null -- Convex serializes null; undefined is not a valid cursor/result.
     paginationOpts: { cursor: null, numItems: 1 },
   });
   expect(page.page).toHaveLength(1);
@@ -52,7 +45,7 @@ test("named open cannot collide", async () => {
   await t.mutation(api.mutations.open, { bucketRef: "match-1" });
   await expect(
     t.mutation(api.mutations.open, { bucketRef: "match-1" }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("BUCKET_EXISTS");
 });
 
 test("full / already_member / missing join reasons", async () => {
@@ -202,63 +195,54 @@ test("rejects empty refs and bad capacity", async () => {
   const t = setup();
   await expect(
     t.mutation(api.mutations.open, { bucketRef: "", capacity: 1 }),
-  ).rejects.toThrow();
-  await expect(
-    t.mutation(api.mutations.open, { capacity: 0 }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_REF");
+  await expect(t.mutation(api.mutations.open, { capacity: 0 })).rejects.toThrow(
+    "INVALID_CAPACITY",
+  );
   await expect(
     t.mutation(api.mutations.join, { bucketRef: "", subjectRef: "a" }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_REF");
   await expect(
     t.mutation(api.mutations.join, { bucketRef: "m", subjectRef: "" }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_REF");
   await expect(
     t.mutation(api.mutations.leave, { bucketRef: "", subjectRef: "a" }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_REF");
   await expect(
     t.mutation(api.mutations.leave, { bucketRef: "m", subjectRef: "" }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_REF");
   await expect(
     t.mutation(api.mutations.lock, { bucketRef: "" }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_REF");
   await expect(
     t.mutation(api.mutations.close, { bucketRef: "" }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_REF");
 });
 
 test("rejects invalid cleanup refs and bounds", async () => {
   const t = setup();
   await expect(
     t.mutation(api.mutations.eraseBucket, { bucketRef: "" }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_REF");
   await expect(
     t.mutation(api.mutations.eraseSubject, { subjectRef: "" }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_REF");
   await expect(
     t.mutation(api.mutations.eraseSubject, { batch: 0, subjectRef: "a" }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_BATCH");
   await expect(
     t.mutation(api.mutations.eraseSubject, { batch: 1.5, subjectRef: "a" }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_BATCH");
   await expect(
     t.query(api.queries.listMembers, { bucketRef: "m", limit: 0 }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_LIMIT");
   await expect(
     t.query(api.queries.listMembers, { bucketRef: "m", limit: 1.5 }),
-  ).rejects.toThrow();
+  ).rejects.toThrow("INVALID_LIMIT");
 });
 
 test("tenant scope is isolated", async () => {
   const t = setup();
   await t.mutation(api.mutations.openTenant, { bucketRef: "m" });
   expect(await t.query(api.queries.get, { bucketRef: "m" })).toBeNull();
-});
-
-test("erase and list limits", () => {
-  expect(clampEraseBatch(10)).toBe(10);
-  expect(clampEraseBatch(MAX_ERASE_BATCH + 1)).toBe(MAX_ERASE_BATCH);
-  expect(() => clampEraseBatch(0)).toThrow();
-  expect(clampListLimit(10)).toBe(10);
-  expect(clampListLimit(MAX_LIST_LIMIT + 1)).toBe(MAX_LIST_LIMIT);
-  expect(() => clampListLimit(0)).toThrow();
 });

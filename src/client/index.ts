@@ -119,7 +119,6 @@ export class Buckets {
     });
   }
 
-  // eslint-disable-next-line max-params -- Preserve the existing positional public API.
   join(
     ctx: RunMutationCtx,
     bucketRef: string,
@@ -133,7 +132,6 @@ export class Buckets {
     });
   }
 
-  // eslint-disable-next-line max-params -- Preserve the existing positional public API.
   leave(
     ctx: RunMutationCtx,
     bucketRef: string,
@@ -180,7 +178,6 @@ export class Buckets {
     });
   }
 
-  // eslint-disable-next-line max-params -- Preserve the existing positional public API.
   paginateMembers(
     ctx: RunQueryCtx,
     bucketRef: string,
@@ -194,7 +191,6 @@ export class Buckets {
     });
   }
 
-  // eslint-disable-next-line max-params -- Preserve the existing positional public API.
   listMembers(
     ctx: RunQueryCtx,
     bucketRef: string,
@@ -208,7 +204,6 @@ export class Buckets {
     });
   }
 
-  // eslint-disable-next-line max-params -- Preserve the existing positional public API.
   eraseBucket(
     ctx: RunMutationCtx,
     bucketRef: string,
@@ -222,7 +217,6 @@ export class Buckets {
     });
   }
 
-  // eslint-disable-next-line max-params -- Preserve the existing positional public API.
   eraseSubject(
     ctx: RunMutationCtx,
     subjectRef: string,

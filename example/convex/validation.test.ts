@@ -18,7 +18,6 @@ test.each(["", "x".repeat(257)])(
     await expect(
       t.query(api.queries.paginateMembers, {
         bucketRef: invalid,
-        // eslint-disable-next-line unicorn/no-null -- Convex serializes null; undefined is not a valid cursor/result.
         paginationOpts: { cursor: null, numItems: 1 },
         scope: "s",
       }),
