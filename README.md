@@ -45,6 +45,13 @@ Node.js >=20.19.0; required peer: `convex@^1.45.0`. Stable releases are
 published to the `latest` dist-tag with npm provenance. Unreleased builds from
 `main` go to the `canary` dist-tag (`pnpm add @vllnt/convex-buckets@canary`).
 
+## For coding agents
+
+The docs are bundled in the package at
+`node_modules/@vllnt/convex-buckets/docs/` (with `llms.txt`, `CHANGELOG.md` and
+the TypeScript `src/`) and match the installed version. Read them before writing
+code against this package.
+
 ## Usage
 
 ```ts
@@ -235,6 +242,18 @@ Multiple mounts are isolated: `app.use(bucketsConfig, { name: "first" })` and
 `Buckets(components.first)` / `Buckets(components.second)` clients. Scopes
 partition data within one mount.
 
+## Related packages
+
+- [`@vllnt/convex-memberships`](https://www.npmjs.com/package/@vllnt/convex-memberships):
+  standing membership and relationship graph (orgs, roles). Use it when the
+  group outlives a session; use buckets for short-lived matches and lobbies.
+- [`@convex-dev/presence`](https://www.npmjs.com/package/@convex-dev/presence):
+  who is online right now. Buckets has no heartbeat; compose presence alongside
+  it.
+- [`@vllnt/convex-invitations`](https://www.npmjs.com/package/@vllnt/convex-invitations):
+  single-use, expiring invitations. Use it for invite-only joins, then call
+  `join` from the host after the invitation is accepted.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -244,11 +263,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 Built by [bntvllnt](https://github.com/bntvllnt) ·
 [bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt)
 
-Part of the [@vllnt](https://github.com/vllnt) Convex component fleet —
-[vllnt.com](https://vllnt.com)
-
 If this is useful, [sponsor the work](https://github.com/sponsors/bntvllnt).
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+---
+
+Part of vllnt oss: https://oss.vllnt.com

@@ -88,7 +88,7 @@
       "handlebars@<4.7.10": "4.7.10"
     }
   },
-  "homepage": "https://github.com/vllnt/convex-buckets#readme",
+  "homepage": "https://oss.vllnt.com/packages/convex-buckets",
   "bugs": {
     "url": "https://github.com/vllnt/convex-buckets/issues"
   },
