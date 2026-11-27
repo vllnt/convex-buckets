@@ -76,6 +76,7 @@ function parseBatch(batch: number | undefined): number {
   return Math.min(raw, MAX_ERASE_BATCH);
 }
 
+/** Creates an `open` bucket; see `Buckets.open`. */
 export const open = mutation({
   args: {
     bucketRef: v.optional(v.string()),
@@ -115,6 +116,7 @@ export const open = mutation({
   returns: v.string(),
 });
 
+/** Adds a member to an `open` bucket within capacity; see `Buckets.join`. */
 export const join = mutation({
   args: {
     bucketRef: v.string(),
@@ -151,6 +153,7 @@ export const join = mutation({
   returns: v.object({ joined: v.boolean(), reason: v.optional(v.string()) }),
 });
 
+/** Removes a member from an `open` or `locked` bucket; see `Buckets.leave`. */
 export const leave = mutation({
   args: {
     bucketRef: v.string(),
@@ -178,6 +181,7 @@ export const leave = mutation({
   returns: v.boolean(),
 });
 
+/** `open` -> `locked`; see `Buckets.lock`. */
 export const lock = mutation({
   args: { bucketRef: v.string(), scope: v.string() },
   handler: async (ctx, arguments_) => {
@@ -196,6 +200,7 @@ export const lock = mutation({
   returns: v.boolean(),
 });
 
+/** `open` or `locked` -> `closed`; see `Buckets.close`. */
 export const close = mutation({
   args: { bucketRef: v.string(), scope: v.string() },
   handler: async (ctx, arguments_) => {
@@ -214,6 +219,7 @@ export const close = mutation({
   returns: v.boolean(),
 });
 
+/** Closes and deletes a bucket in scheduled batches; see `Buckets.eraseBucket`. */
 export const eraseBucket = mutation({
   args: {
     batch: v.optional(v.number()),
@@ -258,6 +264,7 @@ async function eraseBucketBatch(
   return members.length;
 }
 
+/** Scheduled continuation of `eraseBucket`, fenced by bucket document ID. */
 export const continueEraseBucket = internalMutation({
   args: { batch: v.number(), bucketId: v.id("buckets") },
   handler: async (ctx, arguments_) =>
@@ -276,6 +283,7 @@ function subjectMembers(
     );
 }
 
+/** Deletes one batch of a subject's memberships; see `Buckets.eraseSubject`. */
 export const eraseSubject = mutation({
   args: {
     batch: v.optional(v.number()),

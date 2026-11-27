@@ -16,6 +16,10 @@ import type {
   OpenOptions,
 } from "./types.js";
 
+/**
+ * Shape of the mounted component reference, `components.buckets` in the host's
+ * `convex/_generated/api`. Pass it to `new Buckets(...)`.
+ */
 export type BucketsComponent = {
   mutations: {
     close: FunctionReference<
@@ -97,9 +101,21 @@ type RunMutationCtx = {
   ): Promise<FunctionReturnType<TMutation>>;
 };
 
+/**
+ * Host-side client for one mounted buckets component. Call its methods from
+ * host Convex mutations and queries after authorizing the caller; the
+ * component never reads auth. Every method takes an optional `scope`, which
+ * defaults to `defaultScope` (`"global"`).
+ *
+ * @see https://oss.vllnt.com/packages/convex-buckets
+ */
 export class Buckets {
   private readonly defaultScope: string;
 
+  /**
+   * @param component - The mounted component, e.g. `components.buckets`.
+   * @param options - `defaultScope`, the scope for calls that pass none.
+   */
   constructor(
     private readonly component: BucketsComponent,
     options: BucketsOptions = {},
@@ -111,6 +127,11 @@ export class Buckets {
     return scope ?? this.defaultScope;
   }
 
+  /**
+   * Creates an `open` bucket and returns its `bucketRef` (generated when you
+   * pass none). Throws `ConvexError` `INVALID_REF`, `INVALID_CAPACITY` or
+   * `BUCKET_EXISTS`.
+   */
   open(ctx: RunMutationCtx, options: OpenOptions = {}): Promise<string> {
     return ctx.runMutation(this.component.mutations.open, {
       bucketRef: options.bucketRef,
@@ -119,6 +140,11 @@ export class Buckets {
     });
   }
 
+  /**
+   * Adds `subjectRef` to an `open` bucket. Returns `{ joined: true }`, or
+   * `{ joined: false, reason }` with `missing`, `locked`, `closed`,
+   * `already_member` or `full`; it does not throw for these.
+   */
   join(
     ctx: RunMutationCtx,
     bucketRef: string,
@@ -132,6 +158,10 @@ export class Buckets {
     });
   }
 
+  /**
+   * Removes `subjectRef` from an `open` or `locked` bucket. Returns `false`
+   * when the bucket is missing or closed, or the subject is not a member.
+   */
   leave(
     ctx: RunMutationCtx,
     bucketRef: string,
@@ -145,6 +175,10 @@ export class Buckets {
     });
   }
 
+  /**
+   * Stops new joins (`open` -> `locked`). Returns `false` unless the bucket
+   * was `open`.
+   */
   lock(
     ctx: RunMutationCtx,
     bucketRef: string,
@@ -156,6 +190,10 @@ export class Buckets {
     });
   }
 
+  /**
+   * Closes the bucket for good (`open` or `locked` -> `closed`). Returns
+   * `false` when the bucket does not exist or was already closed.
+   */
   close(
     ctx: RunMutationCtx,
     bucketRef: string,
@@ -167,6 +205,7 @@ export class Buckets {
     });
   }
 
+  /** Returns the bucket's state, or `null` when no such bucket exists. */
   get(
     ctx: RunQueryCtx,
     bucketRef: string,
@@ -178,6 +217,11 @@ export class Buckets {
     });
   }
 
+  /**
+   * Returns one page of members in join order. Start with
+   * `{ cursor: null, numItems }` (1..500) and pass `continueCursor` until
+   * `isDone`.
+   */
   paginateMembers(
     ctx: RunQueryCtx,
     bucketRef: string,
@@ -191,6 +235,11 @@ export class Buckets {
     });
   }
 
+  /**
+   * Returns up to `limit` members (default 100; a limit above 500 reads
+   * 500). It does not say whether more exist; use `paginateMembers` for all
+   * members.
+   */
   listMembers(
     ctx: RunQueryCtx,
     bucketRef: string,
@@ -204,6 +253,11 @@ export class Buckets {
     });
   }
 
+  /**
+   * Closes the bucket, deletes up to `batch` members (default 200, max 500)
+   * and schedules the rest. Returns the rows this call deleted, not the
+   * total. Erasure has finished when `get` returns `null`.
+   */
   eraseBucket(
     ctx: RunMutationCtx,
     bucketRef: string,
@@ -217,6 +271,10 @@ export class Buckets {
     });
   }
 
+  /**
+   * Deletes up to `batch` of the subject's memberships in the scope (default
+   * 200, max 500) and schedules nothing. Repeat until it returns `0`.
+   */
   eraseSubject(
     ctx: RunMutationCtx,
     subjectRef: string,

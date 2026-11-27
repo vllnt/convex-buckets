@@ -34,3 +34,7 @@ src/
 - Explicit `args` + `returns`. No bare `v.any()`.
 - 100% test coverage is BLOCKING.
 - `**/_generated/**` is Convex CLI-owned; run `pnpm codegen`.
+- README, `llms.txt` and `docs/` follow the shared docs contract in
+  `scripts/check-documentation.mjs`, run by `pnpm test:package`. Every README
+  `ts` example type-checks against the packed package; the Testing example
+  also runs under Vitest.
