@@ -54,22 +54,26 @@ try {
   ]);
   // Agents read the bundled docs from node_modules, so they must ship and resolve.
   const installed = join(temporary, "node_modules", metadata.name);
-  const docs = readdirSync(join(root, "docs")).map((file) => `docs/${file}`);
-  for (const file of [
+  const missing = [
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
     "llms.txt",
-    ...docs,
-  ])
-    if (!existsSync(join(installed, file)))
-      throw new Error(`tarball is missing ${file}`);
-  for (const file of ["README.md", "llms.txt"])
-    for (const [, link] of readFileSync(join(installed, file), "utf8").matchAll(
-      /\]\((?!https?:|#)([^)\s#]+)/gu,
-    ))
-      if (!existsSync(join(installed, link)))
-        throw new Error(`${file} link ${link} is not in the tarball`);
+    ...readdirSync(join(root, "docs")).map((file) => `docs/${file}`),
+  ].filter((file) => !existsSync(join(installed, file)));
+  if (missing.length > 0)
+    throw new Error(`tarball is missing ${missing.join(", ")}`);
+  const broken = ["README.md", "llms.txt"]
+    .flatMap((file) =>
+      [
+        ...readFileSync(join(installed, file), "utf8").matchAll(
+          /\]\((?!https?:|#)([^)\s#]+)/gu,
+        ),
+      ].map((match) => String(match[1])),
+    )
+    .filter((link) => !existsSync(join(installed, link)));
+  if (broken.length > 0)
+    throw new Error(`links not in the tarball: ${broken.join(", ")}`);
   writeFileSync(
     join(temporary, "consumer.ts"),
     `
