@@ -19,7 +19,11 @@ the `convex@^1.45.0` peer range are unchanged from 0.1.0.
 - `llms.txt` links the files shipped in the package relatively (`./docs/API.md`,
   `./CHANGELOG.md`), so they match the installed version, and adds an Ecosystem
   link to `https://oss.vllnt.com/llms.txt`.
-- `docs/API.md` lists the import entry points and exported types.
+- `docs/API.md` lists the import entry points and exported types, states the
+  Node.js `>=20.19.0` requirement, and names `BUCKET_EXISTS` with the other
+  error codes.
+- The README links `CONTRIBUTING.md` by absolute URL, because that file is not
+  in the package.
 - The README has a "Related packages" section, and `homepage` points at
   `https://oss.vllnt.com/packages/convex-buckets`.
 
