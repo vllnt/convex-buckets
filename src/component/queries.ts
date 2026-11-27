@@ -14,6 +14,7 @@ function fail(code: string, message: string): never {
   throw new ConvexError({ code, message });
 }
 
+/** Bucket state or `null`; see `Buckets.get`. */
 export const get = query({
   args: { bucketRef: v.string(), scope: v.string() },
   handler: async (ctx, arguments_) => {
@@ -43,6 +44,7 @@ export const get = query({
   returns: v.union(v.null(), bucketState),
 });
 
+/** Cursor-paginated members; see `Buckets.paginateMembers`. */
 export const paginateMembers = query({
   args: {
     bucketRef: v.string(),

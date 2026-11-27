@@ -1,275 +1,353 @@
-<!-- Badges -->
-
-[![convex-component](https://img.shields.io/badge/convex-component-EE342F.svg)](https://www.convex.dev/components)
-[![npm](https://img.shields.io/npm/v/@vllnt/convex-buckets.svg)](https://www.npmjs.com/package/@vllnt/convex-buckets)
-[![CI](https://github.com/vllnt/convex-buckets/actions/workflows/ci.yml/badge.svg)](https://github.com/vllnt/convex-buckets/actions/workflows/ci.yml)
-[![license](https://img.shields.io/npm/l/@vllnt/convex-buckets.svg)](./LICENSE)
-
 # @vllnt/convex-buckets
 
-Ephemeral groups of opaque `subjectRef`s — matches, lobbies, cohorts.
+Convex component that stores short-lived groups of opaque subject refs, such as
+matches, lobbies, rooms and cohorts, with capacity limits and an open, locked,
+closed lifecycle.
 
-Not standing orgs (`@vllnt/convex-memberships`), not liveness
-(`@convex-dev/presence`).
+## For coding agents
 
-```ts
-const buckets = new Buckets(components.buckets);
-const id = await buckets.open(ctx, { capacity: 4 });
-await buckets.join(ctx, id, subjectRef);
-await buckets.lock(ctx, id);
-await buckets.close(ctx, id);
-```
+Docs for the installed version are in `node_modules/@vllnt/convex-buckets/`:
+`docs/API.md`, `llms.txt`, `CHANGELOG.md` and the TypeScript `src/`. Read them
+before writing code against this package.
 
-Lifecycle: `open` → `locked` (no new joins) → `closed` (terminal).
+## When to use
 
-## Features
+- Use it when a group lasts for one match, lobby, room or cohort.
+- Use it when concurrent joins must never exceed a capacity.
+- Use it when you need to stop joins, end the group, then erase it in batches.
+- Do not use it for standing orgs, teams or roles: use
+  `@vllnt/convex-memberships`.
+- Do not use it to track who is online: use `@convex-dev/presence`.
 
-- **Capacity + OCC** — `memberCount` lives on the bucket row so concurrent joins
-  retry instead of overfilling.
-- **Join reasons** — `missing` / `locked` / `closed` / `already_member` /
-  `full`.
-- **Leave** while `open` or `locked`, not after `close`.
-- **Pagination** — `paginateMembers` returns a cursor and completion flag;
-  `listMembers` is only a bounded preview (default 100, max 500).
-- **Bounded erase** — `eraseBucket` reschedules fenced batches; `eraseSubject`
-  deletes one batch per call, without background subject sweeps.
-- **Scopes** — default `"global"`.
-
-## Installation
+## Install
 
 ```bash
 pnpm add @vllnt/convex-buckets
 ```
 
-Node.js >=20.19.0; required peer: `convex@^1.45.0`. Stable releases are
-published to the `latest` dist-tag with npm provenance. Unreleased builds from
-`main` go to the `canary` dist-tag (`pnpm add @vllnt/convex-buckets@canary`).
-
-## For coding agents
-
-The docs are bundled in the package at
-`node_modules/@vllnt/convex-buckets/docs/`, next to `llms.txt`, `CHANGELOG.md`
-and the TypeScript `src/` in `node_modules/@vllnt/convex-buckets/`. They match
-the installed version. Read them before writing code against this package.
-
-## Usage
+## Quick start
 
 ```ts
 // convex/convex.config.ts
+import buckets from "@vllnt/convex-buckets/convex.config";
 import { defineApp } from "convex/server";
-import bucketsConfig from "@vllnt/convex-buckets/convex.config";
 
 const app = defineApp();
-app.use(bucketsConfig);
+app.use(buckets);
 export default app;
 ```
 
-The component never reads your auth or tables. Wrap it in host functions that
-authenticate the caller, decide what they may do, and pass the result in:
-
 ```ts
-// convex/matches.ts
-import { paginationOptsValidator, type Auth } from "convex/server";
-import { ConvexError, v } from "convex/values";
+// convex/lobby.ts
 import { Buckets } from "@vllnt/convex-buckets";
+import { ConvexError, v } from "convex/values";
+
 import { components } from "./_generated/api";
-import { mutation, query } from "./_generated/server";
+import { mutation } from "./_generated/server";
 
 const buckets = new Buckets(components.buckets);
 
-// The host derives the subjectRef; never accept it from the client.
-async function requireSubject(ctx: { auth: Auth }): Promise<string> {
-  const identity = await ctx.auth.getUserIdentity();
-  if (identity === null) throw new ConvexError("unauthenticated");
-  return identity.tokenIdentifier;
-}
-
-export const startMatch = mutation({
+export const createLobby = mutation({
   args: {},
   returns: v.string(),
   handler: async (ctx) => {
-    const subjectRef = await requireSubject(ctx);
-    const id = await buckets.open(ctx, { capacity: 4 });
-    const result = await buckets.join(ctx, id, subjectRef);
-    if (!result.joined) throw new ConvexError(result.reason ?? "join failed");
-    return id;
+    const user = await ctx.auth.getUserIdentity();
+    if (user === null) throw new ConvexError("not signed in");
+    const bucketRef = await buckets.open(ctx, { capacity: 4 });
+    await buckets.join(ctx, bucketRef, user.tokenIdentifier);
+    return bucketRef;
   },
 });
 
-export const joinMatch = mutation({
+export const joinLobby = mutation({
+  args: { bucketRef: v.string() },
+  returns: v.object({ joined: v.boolean(), reason: v.optional(v.string()) }),
+  handler: async (ctx, { bucketRef }) => {
+    const user = await ctx.auth.getUserIdentity();
+    if (user === null) throw new ConvexError("not signed in");
+    return buckets.join(ctx, bucketRef, user.tokenIdentifier);
+  },
+});
+```
+
+Run `npx convex dev` once to generate `components.buckets`. The component never
+reads auth: the host derives `subjectRef` (here the user's `tokenIdentifier`)
+and decides who may join.
+
+## API
+
+Full reference: [docs/API.md](docs/API.md).
+
+| Export                                                                                   | Import from                                  | What it does                                                     |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------- |
+| [`Buckets`](docs/API.md#buckets)                                                         | `@vllnt/convex-buckets`                      | Host client: `new Buckets(components.buckets, { defaultScope })` |
+| [`open(ctx, options?)`](docs/API.md#open)                                                | `Buckets` method, mutation                   | Create an `open` bucket; returns its `bucketRef`                 |
+| [`join(ctx, bucketRef, subjectRef, scope?)`](docs/API.md#join)                           | `Buckets` method, mutation                   | Add a member; returns `{ joined, reason? }`                      |
+| [`leave(ctx, bucketRef, subjectRef, scope?)`](docs/API.md#leave)                         | `Buckets` method, mutation                   | Remove a member; returns `boolean`                               |
+| [`lock(ctx, bucketRef, scope?)`](docs/API.md#lock)                                       | `Buckets` method, mutation                   | `open` -> `locked`; returns `boolean`                            |
+| [`close(ctx, bucketRef, scope?)`](docs/API.md#close)                                     | `Buckets` method, mutation                   | `open` or `locked` -> `closed`; returns `boolean`                |
+| [`get(ctx, bucketRef, scope?)`](docs/API.md#get)                                         | `Buckets` method, query                      | Bucket state or `null`                                           |
+| [`listMembers(ctx, bucketRef, scope?, limit?)`](docs/API.md#listmembers)                 | `Buckets` method, query                      | Up to `limit` members (preview)                                  |
+| [`paginateMembers(ctx, bucketRef, paginationOpts, scope?)`](docs/API.md#paginatemembers) | `Buckets` method, query                      | One page of members with a cursor                                |
+| [`eraseBucket(ctx, bucketRef, scope?, batch?)`](docs/API.md#erasebucket)                 | `Buckets` method, mutation                   | Close and delete a bucket in batches                             |
+| [`eraseSubject(ctx, subjectRef, scope?, batch?)`](docs/API.md#erasesubject)              | `Buckets` method, mutation                   | Delete one batch of a subject's memberships                      |
+| [`BucketsComponent`](docs/API.md#bucketscomponent)                                       | `@vllnt/convex-buckets` (type)               | Type of `components.buckets`                                     |
+| [`BucketsOptions`](docs/API.md#bucketsoptions)                                           | `@vllnt/convex-buckets` (type)               | `{ defaultScope? }`                                              |
+| [`OpenOptions`](docs/API.md#openoptions)                                                 | `@vllnt/convex-buckets` (type)               | `{ bucketRef?, capacity?, scope? }`                              |
+| [`BucketState`](docs/API.md#bucketstate)                                                 | `@vllnt/convex-buckets` (type)               | Result of `get`                                                  |
+| [`BucketStatus`](docs/API.md#bucketstatus)                                               | `@vllnt/convex-buckets` (type)               | `"open" \| "locked" \| "closed"`                                 |
+| [`JoinResult`](docs/API.md#joinresult)                                                   | `@vllnt/convex-buckets` (type)               | Result of `join`                                                 |
+| [`MemberState`](docs/API.md#memberstate)                                                 | `@vllnt/convex-buckets` (type)               | `{ subjectRef, joinedAt }`                                       |
+| [`default` (component config)](docs/API.md#convexconfig)                                 | `@vllnt/convex-buckets/convex.config`        | Pass to `app.use(...)`                                           |
+| [`register`](docs/API.md#register)                                                       | `@vllnt/convex-buckets/test`                 | Mount the component in `convex-test`                             |
+| [`ComponentApi`](docs/API.md#componentapi)                                               | `@vllnt/convex-buckets/_generated/component` | Generated type of the mounted component                          |
+
+## Common tasks
+
+Lock a lobby as soon as it is full, so nobody else can join:
+
+```ts
+// convex/matchmaking.ts
+import { Buckets } from "@vllnt/convex-buckets";
+import { ConvexError, v } from "convex/values";
+
+import { components } from "./_generated/api";
+import { mutation } from "./_generated/server";
+
+const buckets = new Buckets(components.buckets);
+
+export const joinAndLockWhenFull = mutation({
   args: { bucketRef: v.string() },
   returns: v.boolean(),
   handler: async (ctx, { bucketRef }) => {
-    const subjectRef = await requireSubject(ctx);
-    // Host-side authorization (invite, friendship, ...) goes here.
-    const result = await buckets.join(ctx, bucketRef, subjectRef);
+    const user = await ctx.auth.getUserIdentity();
+    if (user === null) throw new ConvexError("not signed in");
+    const result = await buckets.join(ctx, bucketRef, user.tokenIdentifier);
+    const state = await buckets.get(ctx, bucketRef);
+    if (state !== null && state.memberCount === state.capacity) {
+      await buckets.lock(ctx, bucketRef);
+    }
     return result.joined;
   },
 });
+```
 
-export const matchState = query({
-  args: { bucketRef: v.string() },
-  returns: v.union(
-    v.null(),
-    v.object({
-      bucketRef: v.string(),
-      capacity: v.optional(v.number()),
-      closedAt: v.optional(v.number()),
-      lockedAt: v.optional(v.number()),
-      memberCount: v.number(),
-      openedAt: v.number(),
-      status: v.union(
-        v.literal("open"),
-        v.literal("locked"),
-        v.literal("closed"),
-      ),
-    }),
-  ),
-  handler: async (ctx, { bucketRef }) => {
-    await requireSubject(ctx);
-    return buckets.get(ctx, bucketRef);
-  },
-});
+List every member with a cursor (`listMembers` is only a preview):
 
-export const matchMembers = query({
+```ts
+// convex/members.ts
+import { Buckets } from "@vllnt/convex-buckets";
+import { paginationOptsValidator } from "convex/server";
+import { v } from "convex/values";
+
+import { components } from "./_generated/api";
+import { query } from "./_generated/server";
+
+const buckets = new Buckets(components.buckets);
+
+export const members = query({
   args: { bucketRef: v.string(), paginationOpts: paginationOptsValidator },
   returns: v.object({
     continueCursor: v.string(),
     isDone: v.boolean(),
     page: v.array(v.object({ joinedAt: v.number(), subjectRef: v.string() })),
   }),
-  handler: async (ctx, { bucketRef, paginationOpts }) => {
-    await requireSubject(ctx);
-    return buckets.paginateMembers(ctx, bucketRef, paginationOpts);
+  handler: (ctx, { bucketRef, paginationOpts }) =>
+    buckets.paginateMembers(ctx, bucketRef, paginationOpts),
+});
+```
+
+Erase a finished bucket, and erase one user from every bucket in a scope (for
+account deletion). `eraseBucket` schedules its own follow-up batches;
+`eraseSubject` does not, so this host function reschedules itself until it
+deletes nothing. Block the user's new joins in your own code while it runs.
+
+```ts
+// convex/cleanup.ts
+import { Buckets } from "@vllnt/convex-buckets";
+import { v } from "convex/values";
+
+import { components, internal } from "./_generated/api";
+import { internalMutation } from "./_generated/server";
+
+const buckets = new Buckets(components.buckets);
+
+export const eraseMatch = internalMutation({
+  args: { bucketRef: v.string() },
+  returns: v.number(),
+  handler: (ctx, { bucketRef }) => buckets.eraseBucket(ctx, bucketRef),
+});
+
+export const eraseUser = internalMutation({
+  args: { subjectRef: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { subjectRef }) => {
+    const deleted = await buckets.eraseSubject(ctx, subjectRef);
+    if (deleted > 0) {
+      await ctx.scheduler.runAfter(0, internal.cleanup.eraseUser, {
+        subjectRef,
+      });
+    }
+    return null;
   },
 });
 ```
 
-After mounting, run `pnpm convex dev` to generate the host's component
-references. Component errors are `ConvexError`s carrying a `code`
-(`INVALID_REF`, `INVALID_CAPACITY`, `INVALID_BATCH`, `INVALID_LIMIT`,
-`BUCKET_EXISTS`); see [docs/API.md](docs/API.md).
+Mount the component twice, or split one mount by scope. Named mounts share no
+data or scheduled work; scopes are namespaces inside one mount, not access
+control.
 
-## Configuration and limits
+```ts
+// convex/convex.config.ts
+import buckets from "@vllnt/convex-buckets/convex.config";
+import { defineApp } from "convex/server";
 
-`new Buckets(component, { defaultScope: "global" })` sets the sole client
-option. `open` accepts `{ bucketRef?, capacity?, scope? }`: omit the ref to
-generate one, omit capacity for no component-level member cap. A supplied
-capacity must be a positive safe integer; refs/scopes must contain 1–256 UTF-16
-code units.
+const app = defineApp();
+app.use(buckets, { name: "lobbies" });
+app.use(buckets, { name: "cohorts" });
+export default app;
+```
 
-`get` returns
-`{ bucketRef, status, memberCount, openedAt, capacity?, lockedAt?, closedAt? }`
-or `null`. Member results are `{ subjectRef, joinedAt }`. Preview limits default
-to 100 and clamp to 500; pagination requires integer `numItems` in 1–500.
-Erasure batches default to 200 and clamp to 500. There is no expiry timer,
-presence heartbeat or standing-role model; the host owns lifecycle decisions and
-may compose official presence separately.
+```ts
+// convex/clients.ts
+import { Buckets } from "@vllnt/convex-buckets";
 
-## API Reference
+import { components } from "./_generated/api";
 
-| Method                                                    | Kind     | Result                                       |
-| --------------------------------------------------------- | -------- | -------------------------------------------- |
-| `open(ctx, opts?)`                                        | mutation | `bucketRef`                                  |
-| `join(ctx, bucketRef, subjectRef, scope?)`                | mutation | `{ joined, reason? }`                        |
-| `leave(ctx, bucketRef, subjectRef, scope?)`               | mutation | `boolean`                                    |
-| `lock` / `close`                                          | mutation | `boolean`                                    |
-| `get(ctx, bucketRef, scope?)`                             | query    | bucket state or `null`                       |
-| `listMembers(ctx, bucketRef, scope?, limit?)`             | query    | bounded preview `{ subjectRef, joinedAt }[]` |
-| `paginateMembers(ctx, bucketRef, paginationOpts, scope?)` | query    | `{ page, isDone, continueCursor }`           |
-| `eraseBucket` / `eraseSubject`                            | mutation | `number` deleted this pass                   |
+export const lobbies = new Buckets(components.lobbies);
+export const cohorts = new Buckets(components.cohorts, {
+  defaultScope: "spring",
+});
+```
 
-Full reference: [docs/API.md](docs/API.md).
+## Errors and fixes
 
-## React
+Invalid input throws a `ConvexError` whose `data` is `{ code, message }`. Catch
+it in the host with `error instanceof ConvexError` and read `error.data.code`.
 
-Backend-only — no `./react` entry.
+| Code               | Message                                                                  | Cause                                                                    | Fix                                                                     |
+| ------------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `INVALID_REF`      | `scope must be 1..256 characters` (or `bucketRef`, `subjectRef`, `refs`) | A scope, bucket or subject ref is empty or longer than 256 characters    | Pass 1..256 characters; hash longer identifiers                         |
+| `INVALID_CAPACITY` | `capacity must be a positive integer`                                    | `open` got a capacity that is 0, negative, fractional, NaN or unsafe     | Pass a positive safe integer, or omit `capacity` for no limit           |
+| `INVALID_BATCH`    | `batch must be a positive integer`                                       | `eraseBucket` or `eraseSubject` got a batch below 1 or not an integer    | Pass a positive integer or omit it (default 200; above 500 is clamped)  |
+| `INVALID_LIMIT`    | `limit must be a positive integer` or `numItems must be 1..500`          | `listMembers` limit below 1 or not an integer; `numItems` outside 1..500 | Pass a positive integer limit; keep `paginationOpts.numItems` in 1..500 |
+| `BUCKET_EXISTS`    | `a bucket with this ref already exists in the scope`                     | `open` got a `bucketRef` that is in use, or still being erased           | Omit `bucketRef` to generate one, or wait until `get` returns `null`    |
 
-## Security
+Arguments of the wrong type (for example a string `capacity`) are rejected by
+Convex argument validation before the component runs.
 
-- Auth-agnostic — the host must authorize every read/write and derive allowed
-  scopes and subject refs. Scopes are namespaces, not authorization. The
-  unauthenticated example is for local testing only.
-- Tables sandboxed — reached only through the exported functions.
-- Capacity is enforced by patching `memberCount` on the bucket document (OCC).
+`join` does not throw when it cannot add a member. It returns
+`{ joined: false, reason }`:
+
+| `reason`         | Cause                                    | Fix                                               |
+| ---------------- | ---------------------------------------- | ------------------------------------------------- |
+| `missing`        | No bucket with this ref in the scope     | Check the ref and scope, or `open` the bucket     |
+| `locked`         | The bucket was locked                    | Open a new bucket                                 |
+| `closed`         | The bucket was closed or is being erased | Open a new bucket                                 |
+| `already_member` | The subject is already in the bucket     | Treat as success if joining twice is harmless     |
+| `full`           | `memberCount` reached `capacity`         | Open another bucket, or wait for someone to leave |
+
+## Limits and gotchas
+
+- Refs and scopes are 1..256 UTF-16 code units, checked on reads too.
+- `capacity` cannot be changed after `open`; there is no update method.
+- `listMembers` returns at most `limit` members (default 100). A limit above 500
+  is clamped to 500 without an error, and nothing tells you more exist.
+- `paginateMembers` requires `numItems` in 1..500 and is not a frozen snapshot
+  under concurrent writes.
+- Erase batches default to 200; a batch above 500 is clamped to 500.
+- `eraseBucket` returns only the rows deleted by that call. The ref stays
+  reserved (`BUCKET_EXISTS`) until `get` returns `null`.
+- `eraseSubject` schedules nothing. A return of `0` means no memberships were
+  left at that moment, not a ban: the subject can join again.
+- `lock`, `close` and `leave` return `false` and change nothing when the bucket
+  is not in a state that allows them. `lock` only works on `open` buckets.
+- `JoinResult.reason` is typed `string`; the values are listed above.
+- There is no expiry timer, presence heartbeat or role model. Schedule `close`
+  or `eraseBucket` yourself.
+- The component does not read auth. Scopes are namespaces, not permissions.
+
+## Compatibility
+
+- Peer dependency: `convex@^1.45.0`. CI tests the package against convex 1.45.0
+  and the current release.
+- Node.js `>=20.19.0`. ES modules only.
+- `@vllnt/convex-buckets/test` needs `convex-test` and Vitest (Vite's
+  `import.meta.glob`).
+- React: not applicable. The package is backend-only and has no `./react` entry.
 
 ## Testing
 
-```bash
-pnpm test
-pnpm test:coverage
-```
-
-Unit tests use the simulated `convex-test` runtime (`@edge-runtime/vm`), not a
-real backend. `example/convex/actions.ts` additionally checks concurrent
-capacity admission and scheduled cleanup on a real local Convex backend. Run
-with an isolated HOME and
-`CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --local-cloud-port 3330 --local-site-port 3331 --run actions:verify`.
-This is targeted evidence, not proof of every concurrency interleaving.
-
-### Testing your app
-
-`@vllnt/convex-buckets/test` exports `register(t, name = "buckets")` to mount
-the component in a `convex-test` instance. It needs `convex-test` and `vitest`
-(with Vite's `import.meta.glob`) in the consuming app:
+Mount the component in your own `convex-test` suite with `register`:
 
 ```ts
+// convex/lobby.test.ts
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
 import { register } from "@vllnt/convex-buckets/test";
+import { convexTest } from "convex-test";
+import { expect, test } from "vitest";
+
+import { api } from "./_generated/api";
 import schema from "./schema";
 
-const t = convexTest(schema, import.meta.glob("./**/*.ts"));
-register(t);
+test("the creator joins the new lobby", async () => {
+  const t = convexTest(schema, import.meta.glob("./**/*.ts"));
+  register(t);
+  const player = t.withIdentity({ tokenIdentifier: "player-1" });
+  const bucketRef = await player.mutation(api.lobby.createLobby, {});
+  const again = await player.mutation(api.lobby.joinLobby, { bucketRef });
+  expect(again).toEqual({ joined: false, reason: "already_member" });
+});
 ```
 
-## Cleanup and isolation
+`register(t, name)` takes the mount name when you used
+`app.use(buckets, { name })`.
 
-`eraseBucket` closes the bucket and updates its remaining count in the first
-transaction. Its ref stays reserved until all members are removed. Scheduled
-continuation uses the original document ID, so stale work cannot erase a
-replacement bucket. Return values count only the current batch; completion is
-observed through `get` returning `null`.
+This repository's own tests use the simulated `convex-test` runtime
+(`pnpm test:coverage`, 100% coverage enforced). `example/convex/actions.ts`
+checks concurrent joins and scheduled cleanup on a real local backend:
+`CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --local-cloud-port 3330 --local-site-port 3331 --run actions:verify`
+(run with an isolated `HOME`).
 
-`eraseSubject` deletes one bounded batch per call and schedules no continuation.
-Block new joins while draining, repeat until it returns zero, then permit joins
-if appropriate. A returned zero is only an observation of current membership,
-not a permanent ban. No queued subject sweep can later remove a recreated
-membership.
+## Security
 
-Multiple mounts are isolated: `app.use(bucketsConfig, { name: "first" })` and
-`app.use(bucketsConfig, { name: "second" })`, accessed through separate
-`Buckets(components.first)` / `Buckets(components.second)` clients. Scopes
-partition data within one mount.
+- The component does not authenticate. The host must authorize every call and
+  derive scopes and subject refs itself; never accept a `subjectRef` from the
+  client.
+- Its tables are reachable only through the component's functions.
+- Capacity is enforced by patching `memberCount` on the bucket document, so
+  concurrent joins conflict and Convex retries them.
+
+Report vulnerabilities as described in
+[SECURITY.md](https://github.com/vllnt/convex-buckets/blob/main/SECURITY.md).
 
 ## Related packages
 
-- [`@vllnt/convex-memberships`](https://www.npmjs.com/package/@vllnt/convex-memberships):
-  standing membership and relationship graph (orgs, roles). Use it when the
-  group outlives a session; use buckets for short-lived matches and lobbies.
+- [`@vllnt/convex-memberships`](https://oss.vllnt.com/packages/convex-memberships):
+  standing memberships and roles (orgs, teams). Use it when the group outlives a
+  session.
 - [`@convex-dev/presence`](https://www.npmjs.com/package/@convex-dev/presence):
-  who is online right now. Buckets has no heartbeat; compose presence alongside
-  it.
-- [`@vllnt/convex-invitations`](https://www.npmjs.com/package/@vllnt/convex-invitations):
-  single-use, expiring invitations. Use it for invite-only joins, then call
-  `join` from the host after the invitation is accepted.
+  who is online now. Buckets has no heartbeat.
+- [`@vllnt/convex-invitations`](https://oss.vllnt.com/packages/convex-invitations):
+  single-use, expiring invitations. Call `join` from the host after an
+  invitation is accepted.
 
 ## Contributing
 
 See
 [CONTRIBUTING.md](https://github.com/vllnt/convex-buckets/blob/main/CONTRIBUTING.md).
 
-## Author
-
-Built by [bntvllnt](https://github.com/bntvllnt) ·
-[bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt)
-
-If this is useful, [sponsor the work](https://github.com/sponsors/bntvllnt).
-
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
+
+[![npm](https://img.shields.io/npm/v/@vllnt/convex-buckets.svg)](https://www.npmjs.com/package/@vllnt/convex-buckets)
+[![CI](https://github.com/vllnt/convex-buckets/actions/workflows/ci.yml/badge.svg)](https://github.com/vllnt/convex-buckets/actions/workflows/ci.yml)
+
+Built by [bntvllnt](https://github.com/bntvllnt) ·
+[bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt).
+[Sponsor the work](https://github.com/sponsors/bntvllnt).
 
 ---
 
-Part of vllnt oss: https://oss.vllnt.com
+Part of [vllnt open source](https://oss.vllnt.com) · [Package page](https://oss.vllnt.com/packages/convex-buckets) · [vllnt.com](https://vllnt.com) · Built by [bntvllnt](https://bntvllnt.com)

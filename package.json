@@ -1,7 +1,7 @@
 {
   "name": "@vllnt/convex-buckets",
   "version": "0.1.1",
-  "description": "Ephemeral groups of opaque subject refs \u2014 matches, lobbies, cohorts \u2014 as a Convex component",
+  "description": "Convex component for short-lived groups such as matches, lobbies and rooms: capacity-limited joins, open/locked/closed lifecycle, batched erase. TypeScript.",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.34.8",
@@ -114,8 +114,13 @@
   "keywords": [
     "convex",
     "convex-component",
-    "buckets",
+    "typescript",
+    "groups",
+    "lobby",
     "match",
-    "lobby"
+    "room",
+    "cohort",
+    "capacity",
+    "buckets"
   ]
 }

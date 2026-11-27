@@ -11,6 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 
+import { checkDocumentation, writeHost } from "./check-documentation.mjs";
+
 const root = process.cwd();
 /** @type {unknown} */
 const metadata = JSON.parse(readFileSync("package.json", "utf8"));
@@ -51,6 +53,8 @@ try {
     "convex-test@0.0.56",
     "vite@8.2.2",
     "@types/node@22.20.2",
+    "vitest@5.1.1",
+    "@edge-runtime/vm@5.0.0",
   ]);
   // Agents read the bundled docs from node_modules, so they must ship and resolve.
   const installed = join(temporary, "node_modules", metadata.name);
@@ -63,17 +67,46 @@ try {
   ].filter((file) => !existsSync(join(installed, file)));
   if (missing.length > 0)
     throw new Error(`tarball is missing ${missing.join(", ")}`);
-  const broken = ["README.md", "llms.txt"]
-    .flatMap((file) =>
-      [
-        ...readFileSync(join(installed, file), "utf8").matchAll(
-          /\]\((?!https?:|#)([^)\s#]+)/gu,
-        ),
-      ].map((match) => String(match[1])),
-    )
-    .filter((link) => !existsSync(join(installed, link)));
-  if (broken.length > 0)
-    throw new Error(`links not in the tarball: ${broken.join(", ")}`);
+  // Docs contract, then README examples run against the built package in a stub host.
+  const examples = checkDocumentation(installed, temporary);
+  const hostFiles = writeHost(
+    temporary,
+    {
+      "convex/_generated/api.ts": `import type { ComponentApi } from "${metadata.name}/_generated/component.js";
+import { anyApi, componentsGeneric } from "convex/server";
+export const api = anyApi;
+export const internal = anyApi;
+export const components = componentsGeneric() as unknown as Record<string, ComponentApi>;
+`,
+      "convex/_generated/server.ts": `export { internalMutationGeneric as internalMutation, mutationGeneric as mutation, queryGeneric as query } from "convex/server";
+`,
+      "convex/schema.ts": `import { defineSchema } from "convex/server";
+export default defineSchema({});
+`,
+    },
+    examples,
+  );
+  run("pnpm", [
+    "exec",
+    "tsc",
+    "--noEmit",
+    "--strict",
+    "--module",
+    "ESNext",
+    "--moduleResolution",
+    "Bundler",
+    "--target",
+    "ES2022",
+    "--types",
+    "vite/client,node",
+    ...hostFiles,
+  ]);
+  writeFileSync(
+    join(temporary, "vitest.config.mjs"),
+    `export default { test: { environment: "edge-runtime", include: ["convex/**/*.test.ts"], server: { deps: { inline: ["convex-test", "${metadata.name}"] } } } };
+`,
+  );
+  run("pnpm", ["exec", "vitest", "run"]);
   writeFileSync(
     join(temporary, "consumer.ts"),
     `
