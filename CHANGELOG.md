@@ -6,22 +6,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-27
+
+Documentation and packaging only. The component's runtime code and the
+`convex@^1.45.0` peer range are unchanged from 0.1.0. The compiled `dist`
+differs from 0.1.0 only by added TSDoc comments.
+
 ### Documentation
 
+- The package now tells coding agents where its version-matched docs are:
+  `node_modules/@vllnt/convex-buckets/docs/`, with `llms.txt` and this
+  changelog. `llms.txt` and the README each have a "For coding agents" note.
 - The README follows the section layout shared by every @vllnt package: For
   coding agents, When to use, Install, Quick start, API, Common tasks, Errors
   and fixes, Limits and gotchas, Compatibility, then Testing, Security, Related
   packages, Contributing, Links and License. It has a table of every export and
   of every error code with its cause and fix.
-- `docs/API.md` has one heading per export and method, so the README links
+- `docs/API.md` lists the import entry points and exported types, states the
+  Node.js `>=20.19.0` requirement, and names `BUCKET_EXISTS` with the other
+  error codes. It has one heading per export and method, so the README links
   straight to each entry.
-- `llms.txt` adds "When to use", links to the errors table, and ends with an
-  Ecosystem block: the package page, its release feed, the @vllnt package index,
-  package and docs search, vllnt and the author.
+- `llms.txt` links the files shipped in the package relatively (`./docs/API.md`,
+  `./CHANGELOG.md`), so they match the installed version. It adds "When to use",
+  links to the errors table, and ends with an Ecosystem block: the package page,
+  its release feed, the @vllnt package index, package and docs search, vllnt and
+  the author.
 - Every public export, `Buckets` method and component function has a TSDoc
   summary; `Buckets` links its package page with `@see`.
 - `package.json` `description` and `keywords` describe what the package does.
   The same description sentence opens the README and is the `llms.txt` summary.
+  `homepage` points at `https://oss.vllnt.com/packages/convex-buckets`.
+- The README Compatibility section lists `vite` with `convex-test`, `vitest` and
+  `@edge-runtime/vm` for `@vllnt/convex-buckets/test`: the Testing example's
+  `vite/client` types need `vite` as a direct dev dependency.
+- The README links `CONTRIBUTING.md` by absolute URL, because that file is not
+  in the package.
 - A Links section lists the package page and release feed, the @vllnt package
   index and search, the source, issues and npm, Discord and X, the company and
   author, and sponsorship.
@@ -29,27 +48,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   through a dependency, a shared test or an example.
 - The README ends with links to vllnt open source, the package page, vllnt.com
   and the author.
-
-## [0.1.1] - 2026-11-27
-
-Documentation and packaging only. The component code, the compiled `dist` and
-the `convex@^1.45.0` peer range are unchanged from 0.1.0.
-
-### Documentation
-
-- The package now tells coding agents where its version-matched docs are:
-  `node_modules/@vllnt/convex-buckets/docs/`, with `llms.txt` and this
-  changelog. `llms.txt` and the README each have a "For coding agents" note.
-- `llms.txt` links the files shipped in the package relatively (`./docs/API.md`,
-  `./CHANGELOG.md`), so they match the installed version, and adds an Ecosystem
-  link to `https://oss.vllnt.com/llms.txt`.
-- `docs/API.md` lists the import entry points and exported types, states the
-  Node.js `>=20.19.0` requirement, and names `BUCKET_EXISTS` with the other
-  error codes.
-- The README links `CONTRIBUTING.md` by absolute URL, because that file is not
-  in the package.
-- The README has a "Related packages" section, and `homepage` points at
-  `https://oss.vllnt.com/packages/convex-buckets`.
 
 ### Release process
 
