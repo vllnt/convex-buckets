@@ -1,9 +1,10 @@
+import { ConvexError } from "convex/values";
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
 
 import { register } from "../../src/test";
 
-import { api } from "./_generated/api";
+import { api, components } from "./_generated/api";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -245,4 +246,21 @@ test("tenant scope is isolated", async () => {
   const t = setup();
   await t.mutation(api.mutations.openTenant, { bucketRef: "m" });
   expect(await t.query(api.queries.get, { bucketRef: "m" })).toBeNull();
+});
+
+test("a host sees the error code in ConvexError data", async () => {
+  const t = setup();
+  await t.mutation(api.mutations.open, { bucketRef: "taken" });
+  const data = await t.run(async (ctx) => {
+    try {
+      await ctx.runMutation(components.buckets.mutations.open, {
+        bucketRef: "taken",
+        scope: "global",
+      });
+      return null;
+    } catch (error) {
+      return error instanceof ConvexError ? (error.data as unknown) : null;
+    }
+  });
+  expect(data).toMatchObject({ code: "BUCKET_EXISTS" });
 });

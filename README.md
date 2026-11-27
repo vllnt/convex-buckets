@@ -15,9 +15,9 @@ before writing code against this package.
 - Use it when a group lasts for one match, lobby, room or cohort.
 - Use it when concurrent joins must never exceed a capacity.
 - Use it when you need to stop joins, end the group, then erase it in batches.
-- Do not use it for standing orgs, teams or roles: use
+- Do not use it when the group outlives a session (orgs, teams, roles): use
   `@vllnt/convex-memberships`.
-- Do not use it to track who is online: use `@convex-dev/presence`.
+- Do not use it when you need to know who is online: use `@convex-dev/presence`.
 
 ## Install
 
@@ -266,19 +266,38 @@ Convex argument validation before the component runs.
 - There is no expiry timer, presence heartbeat or role model. Schedule `close`
   or `eraseBucket` yourself.
 - The component does not read auth. Scopes are namespaces, not permissions.
+- A wrong or missing scope raises no error: `get` returns `null`, `join` returns
+  `missing`, and `eraseBucket` and `eraseSubject` return `0`.
+- `listMembers(ctx, bucketRef, scope?, limit?)` takes `scope` before `limit`;
+  pass `undefined` as the scope to keep the default.
 
 ## Compatibility
 
 - Peer dependency: `convex@^1.45.0`. CI tests the package against convex 1.45.0
   and the current release.
 - Node.js `>=20.19.0`. ES modules only.
-- `@vllnt/convex-buckets/test` needs `convex-test` and Vitest (Vite's
-  `import.meta.glob`).
+- Node.js 22 or later for convex 1.50 and newer, which require it.
+- `@vllnt/convex-buckets/test` needs `convex-test`, `vitest` and
+  `@edge-runtime/vm`, with the Vitest config shown under Testing.
 - React: not applicable. The package is backend-only and has no `./react` entry.
 
 ## Testing
 
-Mount the component in your own `convex-test` suite with `register`:
+Mount the component in your own `convex-test` suite with `register`. Vitest must
+run in the edge runtime and transform this package, because the helper is
+TypeScript source that uses `import.meta.glob`:
+
+```ts
+// vitest.config.mts
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    environment: "edge-runtime",
+    server: { deps: { inline: ["convex-test", "@vllnt/convex-buckets"] } },
+  },
+});
+```
 
 ```ts
 // convex/lobby.test.ts

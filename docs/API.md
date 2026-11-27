@@ -125,13 +125,13 @@ invocation, not the total. Observe `get === null` for completion.
 eraseSubject(ctx, subjectRef: string, scope?: string, batch?: number): Promise<number>
 ```
 
-Deletes at most `batch` memberships (default 200, max 500), updates bucket
-counts, and tolerates orphan rows. Returns the number deleted in this
-invocation. **Does not schedule a continuation.** The host blocks new joins
-while repeatedly calling this method until it returns zero; it may then permit
-rejoining without latent subject-erasure jobs. Zero is an observation, not a
-permanent ban or a concurrent-write fence. No ordering or uniqueness guarantee
-is assumed for `_creationTime`; it is not a safe generation boundary.
+Deletes at most `batch` of the subject's memberships in the scope (default 200,
+max 500) and updates each bucket's `memberCount`. Memberships whose bucket no
+longer exists are deleted too. Returns the number deleted by this call. **It
+schedules nothing**: call it again until it returns `0`, and block the subject's
+new joins in your own code while you do. Once it returns `0` you may allow joins
+again; no queued job will remove them later. A `0` reflects that moment only: it
+is not a ban, and a join that commits afterwards is kept.
 
 ## Types
 

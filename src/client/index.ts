@@ -236,8 +236,9 @@ export class Buckets {
   }
 
   /**
-   * Returns up to `limit` members (default 100; a limit above 500 reads 500). It does not say whether more exist; use `paginateMembers` for
-   * all members.
+   * Returns up to `limit` members (default 100; a limit above 500 reads
+   * 500). It does not say whether more exist; use `paginateMembers` for all
+   * members.
    */
   listMembers(
     ctx: RunQueryCtx,

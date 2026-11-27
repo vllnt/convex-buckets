@@ -136,6 +136,9 @@ function checkStructure(readme, packageName) {
     readme.startsWith(`# ${packageName}\n\n`),
     "README starts with # <package name> and one sentence",
   );
+  const intro = readme.split("\n\n")[1] ?? "";
+  const stops = intro.match(/[!.?](?=\s|$)/gu) ?? [];
+  assert.ok(stops.length === 1 && /[!.?]$/u.test(intro), "title: one sentence");
   const parts = sections(readme);
   assert.deepEqual(
     parts.map(({ name }) => name),
@@ -160,9 +163,14 @@ function checkWhenToUse(parts) {
     .split("\n")
     .filter((line) => line.startsWith("- "));
   const use = bullets.filter((line) => line.startsWith("- Use it when "));
-  const avoid = bullets.filter((line) => line.startsWith("- Do not use it "));
+  const avoid = bullets.filter((line) =>
+    line.startsWith("- Do not use it when "),
+  );
   assert.ok(use.length >= 2 && use.length <= 4, "2 to 4 'Use it when' bullets");
-  assert.ok(avoid.length > 0 && avoid.length <= 3, "1 to 3 'Do not use it'");
+  assert.ok(
+    avoid.length > 0 && avoid.length <= 3,
+    "1 to 3 'Do not use it when'",
+  );
   assert.deepEqual(bullets, [...use, ...avoid], "'Use it when' bullets first");
   avoid.forEach((line) => {
     assert.match(line, /`[^`]+`/u, "'Do not use it' names the better choice");
@@ -198,7 +206,7 @@ function checkCode(texts) {
       const where = `README.md:${String(block.line)}`;
       const gap = /^\s*(?:\/\/\s*)?(?:\.\.\.|…)\s*$/mu;
       assert.doesNotMatch(block.code, gap, `${where} has a ... gap`);
-      const path = /^\/\/ (\S+\.ts)\n/u.exec(block.code)?.[1];
+      const path = /^\/\/ (\S+\.m?ts)\n/u.exec(block.code)?.[1];
       assert.ok(path, `${where} must start with a // <path>.ts comment`);
       return { code: block.code, path };
     });
@@ -316,7 +324,7 @@ function checkSee(entries, page) {
 
 /** Every thrown error code is in the errors table and the reference. @param {string} installed @param {string} errors @param {string} reference */
 function checkErrorCodes(installed, errors, reference) {
-  const throwing = /\bfail\(\s*"([A-Z][\dA-Z_]+)"/gu;
+  const throwing = /\b(?:fail\(|code:)\s*"([A-Z][\dA-Z_]+)"/gu;
   const codes = new Set(
     filesUnder(join(installed, "src"))
       .filter((file) => file.endsWith(".ts") && !file.includes("_generated"))
@@ -383,6 +391,20 @@ function checkApi(consumer, metadata, documented) {
   checkSee(entries, `${OSS}/packages/${name}`);
 }
 
+/**
+ * Search metadata: one description sentence naming the stack, 8 to 12 keywords.
+ * @param {{ description?: unknown, keywords?: unknown }} metadata
+ */
+function checkMetadata({ description, keywords }) {
+  assert.ok(typeof description === "string", "package.json needs description");
+  assert.ok(description.length <= 160, "description: 160 characters at most");
+  assert.doesNotMatch(description, /vllnt/iu, "description: not 'for vllnt'");
+  assert.ok(Array.isArray(keywords), "package.json needs keywords");
+  const unique = new Set(keywords);
+  assert.equal(unique.size, keywords.length, "keywords repeat");
+  assert.ok(unique.size >= 8 && unique.size <= 12, "8 to 12 keywords");
+}
+
 /** Shipped docs keyed by package-relative path. @param {string} installed */
 function readTexts(installed) {
   const references = readdirSync(join(installed, "docs")).map(
@@ -401,11 +423,12 @@ function readTexts(installed) {
  * @param {string} consumer project that has the package installed
  */
 export function checkDocumentation(installed, consumer) {
-  /** @type {{ exports: Record<string, unknown>, name: string }} */
+  /** @type {{ description?: unknown, exports: Record<string, unknown>, keywords?: unknown, name: string }} */
   const metadata = JSON.parse(
     readFileSync(join(installed, "package.json"), "utf8"),
   );
   const name = metadata.name.split("/").at(-1) ?? metadata.name;
+  checkMetadata(metadata);
   const texts = readTexts(installed);
   const readme = String(texts["README.md"]);
   const reference = String(texts["docs/API.md"]);
@@ -415,7 +438,10 @@ export function checkDocumentation(installed, consumer) {
   checkLinks(installed, texts);
   checkApi(consumer, metadata, {
     headings: anchors(reference),
-    table: section(parts, "API").body,
+    table: section(parts, "API")
+      .body.split("\n")
+      .filter((line) => line.startsWith("|"))
+      .join("\n"),
   });
   checkErrorCodes(
     installed,
@@ -452,4 +478,68 @@ export function writeHost(consumer, stubs, examples) {
     writeFileSync(join(consumer, target), code);
   });
   return written;
+}
+
+/**
+ * Component mount names used by the README's `convex.config.ts` blocks.
+ * @param {string} installed @param {{ code: string, path: string }[]} examples
+ */
+function mountsOf(installed, examples) {
+  const config = join(installed, "src/component/convex.config.ts");
+  const definition = /defineComponent\(\s*"([^"]+)"/u;
+  const component = definition.exec(readFileSync(config, "utf8"))?.[1];
+  assert.ok(component, "cannot read the component name");
+  const use = /app\.use\(\s*\w+\s*(?:,\s*\{\s*name:\s*"([^"]+)"\s*\})?\s*\)/gu;
+  const names = examples
+    .filter(({ path }) => path.endsWith("convex.config.ts"))
+    .flatMap(({ code }) => [...code.matchAll(use)])
+    .map((match) => match[1] ?? component);
+  return [...new Set(names)];
+}
+
+/** README modules that define functions, as `api` keys. @param {{ path: string }[]} examples */
+const modulesOf = (examples) =>
+  [...new Set(examples.map(({ path }) => path))]
+    .filter(
+      (path) =>
+        path.startsWith("convex/") &&
+        !/convex\.config|\.test\.|_generated|schema/u.test(path),
+    )
+    .map((path) => path.slice("convex/".length, -".ts".length));
+
+/**
+ * Stub `convex/_generated` files typed from the README examples: `api` and
+ * `internal` from the example modules, `components` from their mounts.
+ * @param {string} installed @param {{ code: string, path: string }[]} examples
+ * @returns {Record<string, string>}
+ */
+export function convexHost(installed, examples) {
+  /** @type {{ name: string }} */
+  const { name } = JSON.parse(
+    readFileSync(join(installed, "package.json"), "utf8"),
+  );
+  const modules = modulesOf(examples);
+  const fields = modules.map(
+    (module, index) => `"${module}": typeof m${String(index)};`,
+  );
+  const mounts = mountsOf(installed, examples).map(
+    (mount) => `"${mount}": ComponentApi;`,
+  );
+  const api = [
+    `import type { ComponentApi } from "${name}/_generated/component.js";`,
+    `import { anyApi, componentsGeneric, type ApiFromModules, type FilterApi, type FunctionReference } from "convex/server";`,
+    ...modules.map(
+      (module, index) =>
+        `import type * as m${String(index)} from "../${module}.js";`,
+    ),
+    `type FullApi = ApiFromModules<{ ${fields.join(" ")} }>;`,
+    `export const api = anyApi as unknown as FilterApi<FullApi, FunctionReference<any, "public">>;`,
+    `export const internal = anyApi as unknown as FilterApi<FullApi, FunctionReference<any, "internal">>;`,
+    `export const components = componentsGeneric() as unknown as { ${mounts.join(" ")} };`,
+  ];
+  return {
+    "convex/_generated/api.ts": `${api.join("\n")}\n`,
+    "convex/_generated/server.ts": `export { internalMutationGeneric as internalMutation, mutationGeneric as mutation, queryGeneric as query } from "convex/server";\n`,
+    "convex/schema.ts": `import { defineSchema } from "convex/server";\nexport default defineSchema({});\n`,
+  };
 }

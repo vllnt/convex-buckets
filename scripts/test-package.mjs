@@ -11,7 +11,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 
-import { checkDocumentation, writeHost } from "./check-documentation.mjs";
+import {
+  checkDocumentation,
+  convexHost,
+  writeHost,
+} from "./check-documentation.mjs";
 
 const root = process.cwd();
 /** @type {unknown} */
@@ -71,19 +75,7 @@ try {
   const examples = checkDocumentation(installed, temporary);
   const hostFiles = writeHost(
     temporary,
-    {
-      "convex/_generated/api.ts": `import type { ComponentApi } from "${metadata.name}/_generated/component.js";
-import { anyApi, componentsGeneric } from "convex/server";
-export const api = anyApi;
-export const internal = anyApi;
-export const components = componentsGeneric() as unknown as Record<string, ComponentApi>;
-`,
-      "convex/_generated/server.ts": `export { internalMutationGeneric as internalMutation, mutationGeneric as mutation, queryGeneric as query } from "convex/server";
-`,
-      "convex/schema.ts": `import { defineSchema } from "convex/server";
-export default defineSchema({});
-`,
-    },
+    convexHost(installed, examples),
     examples,
   );
   run("pnpm", [
@@ -101,11 +93,7 @@ export default defineSchema({});
     "vite/client,node",
     ...hostFiles,
   ]);
-  writeFileSync(
-    join(temporary, "vitest.config.mjs"),
-    `export default { test: { environment: "edge-runtime", include: ["convex/**/*.test.ts"], server: { deps: { inline: ["convex-test", "${metadata.name}"] } } } };
-`,
-  );
+  // The README's own vitest.config.mts runs its test example.
   run("pnpm", ["exec", "vitest", "run"]);
   writeFileSync(
     join(temporary, "consumer.ts"),

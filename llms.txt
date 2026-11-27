@@ -24,9 +24,9 @@ entry.
 - Use it when a group lasts for one match, lobby, room or cohort.
 - Use it when concurrent joins must never exceed a capacity.
 - Use it when you need to stop joins, end the group, then erase it in batches.
-- Do not use it for standing orgs, teams or roles: use
+- Do not use it when the group outlives a session (orgs, teams, roles): use
   `@vllnt/convex-memberships`.
-- Do not use it to track who is online: use `@convex-dev/presence`.
+- Do not use it when you need to know who is online: use `@convex-dev/presence`.
 
 ## For coding agents
 
