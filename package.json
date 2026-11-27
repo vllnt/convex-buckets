@@ -10,6 +10,7 @@
     "src",
     "docs/API.md",
     "CHANGELOG.md",
+    "llms.txt",
     "!src/**/*.test.*",
     "!src/**/*.spec.*"
   ],
