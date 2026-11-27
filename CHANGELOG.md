@@ -9,8 +9,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Documentation
 
 - The README follows the section layout shared by every @vllnt package: For
-  coding agents, When to use, Install, Quick start, API, Common tasks, Errors and
-  fixes, Limits and gotchas, Compatibility, then Testing, Security, Related
+  coding agents, When to use, Install, Quick start, API, Common tasks, Errors
+  and fixes, Limits and gotchas, Compatibility, then Testing, Security, Related
   packages, Contributing and License. It has a table of every export and of
   every error code with its cause and fix.
 - `docs/API.md` has one heading per export and method, so the README links
