@@ -6,6 +6,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-27
+
+Documentation and packaging only. The component code, the compiled `dist` and
+the `convex@^1.45.0` peer range are unchanged from 0.1.0.
+
 ### Documentation
 
 - The package now tells coding agents where its version-matched docs are:
@@ -14,7 +19,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `llms.txt` links the files shipped in the package relatively (`./docs/API.md`,
   `./CHANGELOG.md`), so they match the installed version, and adds an Ecosystem
   link to `https://oss.vllnt.com/llms.txt`.
-- `docs/API.md` lists the import entry points and exported types.
+- `docs/API.md` lists the import entry points and exported types, states the
+  Node.js `>=20.19.0` requirement, and names `BUCKET_EXISTS` with the other
+  error codes.
+- The README links `CONTRIBUTING.md` by absolute URL, because that file is not
+  in the package.
 - The README has a "Related packages" section, and `homepage` points at
   `https://oss.vllnt.com/packages/convex-buckets`.
 
