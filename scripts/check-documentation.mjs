@@ -82,13 +82,16 @@ export const slug = (heading) =>
     .replaceAll(/[^\p{L}\p{N}\s_-]/gu, "")
     .replaceAll(/\s/gu, "-");
 
-/** @param {string} text @returns {Set<string>} */
+/** Heading anchors, skipping `#` lines in code blocks. @param {string} text @returns {Set<string>} */
 function anchors(text) {
   /** @type {Map<string, number>} */
   const seen = new Map();
+  const headings = linesOutsideCode(text).flatMap(
+    ({ content }) => /^#{1,6}\s+(.+)$/u.exec(content)?.slice(1) ?? [],
+  );
   return new Set(
-    [...text.matchAll(/^#{1,6}\s+(.+)$/gmu)].map((match) => {
-      const base = slug(String(match[1]));
+    headings.map((heading) => {
+      const base = slug(heading);
       const count = seen.get(base) ?? 0;
       seen.set(base, count + 1);
       return count === 0 ? base : `${base}-${String(count)}`;
@@ -117,9 +120,8 @@ export function codeBlocks(text) {
   return state.blocks;
 }
 
-/** `##` sections outside code blocks. @param {string} text @returns {Section[]} */
-function sections(text) {
-  const lines = text.split("\n");
+/** Lines outside code blocks with 1-based line numbers. @param {string} text */
+function linesOutsideCode(text) {
   const inCode = new Set(
     codeBlocks(text).flatMap(({ code, line }) =>
       Array.from(
@@ -128,11 +130,18 @@ function sections(text) {
       ),
     ),
   );
-  const heads = lines
+  return text
+    .split("\n")
     .map((content, index) => ({ content, line: index + 1 }))
-    .filter(
-      ({ content, line }) => content.startsWith("## ") && !inCode.has(line),
-    );
+    .filter(({ line }) => !inCode.has(line));
+}
+
+/** `##` sections outside code blocks. @param {string} text @returns {Section[]} */
+function sections(text) {
+  const lines = text.split("\n");
+  const heads = linesOutsideCode(text).filter(({ content }) =>
+    content.startsWith("## "),
+  );
   return heads.map((head, index) => ({
     body: lines
       .slice(head.line, (heads[index + 1]?.line ?? lines.length + 1) - 1)
@@ -378,7 +387,7 @@ function checkLlms(llms, name) {
   assert.equal(index, 1, "llms.txt links the package index once");
 }
 
-/** @vllnt names under "Related packages" link their package page; no vllnt.ai anywhere. @param {string} installed @param {Record<string, string>} texts */
+/** @vllnt names under "Related packages" link their package page; no retired vllnt domain anywhere. @param {string} installed @param {Record<string, string>} texts */
 function checkBacklinks(installed, texts) {
   Object.entries(texts).forEach(([file, text]) => {
     const related =
@@ -392,7 +401,11 @@ function checkBacklinks(installed, texts) {
   });
   filesUnder(installed).forEach((file) => {
     const text = readFileSync(file, "utf8");
-    assert.doesNotMatch(text, /vllnt\.ai/iu, `${file} mentions vllnt.ai`);
+    assert.doesNotMatch(
+      text,
+      /vllnt\.ai/iu,
+      `${file} mentions the retired vllnt domain`,
+    );
   });
 }
 

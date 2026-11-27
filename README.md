@@ -224,13 +224,13 @@ export const cohorts = new Buckets(components.cohorts, {
 Invalid input throws a `ConvexError` whose `data` is `{ code, message }`. Catch
 it in the host with `error instanceof ConvexError` and read `error.data.code`.
 
-| Code               | Message                                                                  | Cause                                                                    | Fix                                                                     |
-| ------------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| `INVALID_REF`      | `scope must be 1..256 characters` (or `bucketRef`, `subjectRef`, `refs`) | A scope, bucket or subject ref is empty or longer than 256 characters    | Pass 1..256 characters; hash longer identifiers                         |
-| `INVALID_CAPACITY` | `capacity must be a positive integer`                                    | `open` got a capacity that is 0, negative, fractional, NaN or unsafe     | Pass a positive safe integer, or omit `capacity` for no limit           |
-| `INVALID_BATCH`    | `batch must be a positive integer`                                       | `eraseBucket` or `eraseSubject` got a batch below 1 or not an integer    | Pass a positive integer or omit it (default 200; above 500 is clamped)  |
-| `INVALID_LIMIT`    | `limit must be a positive integer` or `numItems must be 1..500`          | `listMembers` limit below 1 or not an integer; `numItems` outside 1..500 | Pass a positive integer limit; keep `paginationOpts.numItems` in 1..500 |
-| `BUCKET_EXISTS`    | `a bucket with this ref already exists in the scope`                     | `open` got a `bucketRef` that is in use, or still being erased           | Omit `bucketRef` to generate one, or wait until `get` returns `null`    |
+| Code               | Message                                                                  | Cause                                                                      | Fix                                                                                                           |
+| ------------------ | ------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `INVALID_REF`      | `scope must be 1..256 characters` (or `bucketRef`, `subjectRef`, `refs`) | A scope, bucket or subject ref is empty or longer than 256 characters      | Pass 1..256 characters; hash longer identifiers                                                               |
+| `INVALID_CAPACITY` | `capacity must be a positive integer`                                    | `open` got a capacity that is 0, negative, fractional, NaN or unsafe       | Pass a positive safe integer, or omit `capacity` for no limit                                                 |
+| `INVALID_BATCH`    | `batch must be a positive integer`                                       | `eraseBucket` or `eraseSubject` got a batch below 1 or not an integer      | Pass a positive integer or omit it (default 200; above 500 is clamped)                                        |
+| `INVALID_LIMIT`    | `limit must be a positive integer` or `numItems must be 1..500`          | `listMembers` limit below 1 or not an integer; `numItems` outside 1..500   | Pass a positive integer limit; keep `paginationOpts.numItems` in 1..500                                       |
+| `BUCKET_EXISTS`    | `a bucket with this ref already exists in the scope`                     | `open` got a `bucketRef` that is in use (closed too) or still being erased | Omit `bucketRef` to generate one, or call `eraseBucket` on the old bucket and wait until `get` returns `null` |
 
 Arguments of the wrong type (for example a string `capacity`) are rejected by
 Convex argument validation before the component runs.
@@ -256,7 +256,8 @@ Convex argument validation before the component runs.
   under concurrent writes.
 - Erase batches default to 200; a batch above 500 is clamped to 500.
 - `eraseBucket` returns only the rows deleted by that call. The ref stays
-  reserved (`BUCKET_EXISTS`) until `get` returns `null`.
+  reserved (`BUCKET_EXISTS`) until `get` returns `null`. `close` keeps the
+  bucket row, so a closed bucket's ref is freed only by `eraseBucket`.
 - `eraseSubject` schedules nothing. A return of `0` means no memberships were
   left at that moment, not a ban: the subject can join again.
 - `lock`, `close` and `leave` return `false` and change nothing when the bucket
@@ -274,8 +275,9 @@ Convex argument validation before the component runs.
 
 ## Compatibility
 
-- Peer dependency: `convex@^1.45.0`. CI tests the package against convex 1.45.0
-  and the current release.
+- Peer dependency: `convex@^1.45.0`. CI runs the unit tests on the locked convex
+  version (1.51.0), and type-checks and runs the packed package against convex
+  1.45.0.
 - Node.js `>=20.19.0`. ES modules only.
 - Node.js 22 or later for convex 1.49 and newer, which require it.
 - `@vllnt/convex-buckets/test` needs `convex-test`, `vitest` and
@@ -365,10 +367,6 @@ MIT. See [LICENSE](LICENSE).
 
 [![npm](https://img.shields.io/npm/v/@vllnt/convex-buckets.svg)](https://www.npmjs.com/package/@vllnt/convex-buckets)
 [![CI](https://github.com/vllnt/convex-buckets/actions/workflows/ci.yml/badge.svg)](https://github.com/vllnt/convex-buckets/actions/workflows/ci.yml)
-
-Built by [bntvllnt](https://github.com/bntvllnt) ·
-[bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt).
-[Sponsor the work](https://github.com/sponsors/bntvllnt).
 
 ---
 
