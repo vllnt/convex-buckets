@@ -14,7 +14,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `llms.txt` links the files shipped in the package relatively (`./docs/API.md`,
   `./CHANGELOG.md`), so they match the installed version, and adds an Ecosystem
   link to `https://oss.vllnt.com/llms.txt`.
-- `docs/API.md` lists every entry point and exported type.
+- `docs/API.md` lists the import entry points and exported types.
 - The README has a "Related packages" section, and `homepage` points at
   `https://oss.vllnt.com/packages/convex-buckets`.
 

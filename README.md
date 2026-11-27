@@ -48,9 +48,9 @@ published to the `latest` dist-tag with npm provenance. Unreleased builds from
 ## For coding agents
 
 The docs are bundled in the package at
-`node_modules/@vllnt/convex-buckets/docs/` (with `llms.txt`, `CHANGELOG.md` and
-the TypeScript `src/`) and match the installed version. Read them before writing
-code against this package.
+`node_modules/@vllnt/convex-buckets/docs/`, next to `llms.txt`, `CHANGELOG.md`
+and the TypeScript `src/` in `node_modules/@vllnt/convex-buckets/`. They match
+the installed version. Read them before writing code against this package.
 
 ## Usage
 
@@ -256,7 +256,8 @@ partition data within one mount.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See
+[CONTRIBUTING.md](https://github.com/vllnt/convex-buckets/blob/main/CONTRIBUTING.md).
 
 ## Author
 

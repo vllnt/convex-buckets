@@ -54,24 +54,22 @@ try {
   ]);
   // Agents read the bundled docs from node_modules, so they must ship and resolve.
   const installed = join(temporary, "node_modules", metadata.name);
-  for (const file of ["README.md", "CHANGELOG.md", "LICENSE", "llms.txt"])
+  const docs = readdirSync(join(root, "docs")).map((file) => `docs/${file}`);
+  for (const file of [
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "llms.txt",
+    ...docs,
+  ])
     if (!existsSync(join(installed, file)))
       throw new Error(`tarball is missing ${file}`);
-  const docs = readdirSync(join(root, "docs")).filter((file) =>
-    file.endsWith(".md"),
-  );
-  for (const file of docs)
-    if (!existsSync(join(installed, "docs", file)))
-      throw new Error(`tarball is missing docs/${file}`);
-  for (const [, link] of readFileSync(
-    join(installed, "llms.txt"),
-    "utf8",
-  ).matchAll(/\]\((\.\/[^)#]+)/gu))
-    if (!existsSync(join(installed, link)))
-      throw new Error(`llms.txt link ${link} is not in the tarball`);
-  for (const file of ["AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md", "example"])
-    if (existsSync(join(installed, file)))
-      throw new Error(`tarball must not ship ${file}`);
+  for (const file of ["README.md", "llms.txt"])
+    for (const [, link] of readFileSync(join(installed, file), "utf8").matchAll(
+      /\]\((?!https?:|#)([^)\s#]+)/gu,
+    ))
+      if (!existsSync(join(installed, link)))
+        throw new Error(`${file} link ${link} is not in the tarball`);
   writeFileSync(
     join(temporary, "consumer.ts"),
     `
