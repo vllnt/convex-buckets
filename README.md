@@ -280,8 +280,9 @@ Convex argument validation before the component runs.
   1.45.0.
 - Node.js `>=20.19.0`. ES modules only.
 - Node.js 22 or later for convex 1.49 and newer, which require it.
-- `@vllnt/convex-buckets/test` needs `convex-test`, `vitest` and
-  `@edge-runtime/vm`, with the Vitest config shown under Testing.
+- `@vllnt/convex-buckets/test` needs `convex-test`, `vitest`, `vite` and
+  `@edge-runtime/vm`, with the Vitest config shown under Testing. Add `vite` as
+  a direct dev dependency: the example's `vite/client` types come from it.
 - React: not applicable. The package is backend-only and has no `./react` entry.
 
 ## Testing
