@@ -266,8 +266,10 @@ Convex argument validation before the component runs.
 - There is no expiry timer, presence heartbeat or role model. Schedule `close`
   or `eraseBucket` yourself.
 - The component does not read auth. Scopes are namespaces, not permissions.
-- A wrong or missing scope raises no error: `get` returns `null`, `join` returns
-  `missing`, and `eraseBucket` and `eraseSubject` return `0`.
+- A wrong or missing scope raises no error. Every method acts as if the bucket
+  does not exist: `get` returns `null`, `join` returns `missing`, `leave`,
+  `lock` and `close` return `false`, `listMembers` and `paginateMembers` return
+  no members, and `eraseBucket` and `eraseSubject` return `0`.
 - `listMembers(ctx, bucketRef, scope?, limit?)` takes `scope` before `limit`;
   pass `undefined` as the scope to keep the default.
 
@@ -276,7 +278,7 @@ Convex argument validation before the component runs.
 - Peer dependency: `convex@^1.45.0`. CI tests the package against convex 1.45.0
   and the current release.
 - Node.js `>=20.19.0`. ES modules only.
-- Node.js 22 or later for convex 1.50 and newer, which require it.
+- Node.js 22 or later for convex 1.49 and newer, which require it.
 - `@vllnt/convex-buckets/test` needs `convex-test`, `vitest` and
   `@edge-runtime/vm`, with the Vitest config shown under Testing.
 - React: not applicable. The package is backend-only and has no `./react` entry.

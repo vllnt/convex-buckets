@@ -392,7 +392,8 @@ function checkApi(consumer, metadata, documented) {
 }
 
 /**
- * Search metadata: one description sentence naming the stack, 8 to 12 keywords.
+ * Search metadata: a description of 160 characters at most that does not
+ * mention vllnt, and 8 to 12 unique keywords.
  * @param {{ description?: unknown, keywords?: unknown }} metadata
  */
 function checkMetadata({ description, keywords }) {
