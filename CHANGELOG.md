@@ -11,17 +11,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The README follows the section layout shared by every @vllnt package: For
   coding agents, When to use, Install, Quick start, API, Common tasks, Errors
   and fixes, Limits and gotchas, Compatibility, then Testing, Security, Related
-  packages, Contributing and License. It has a table of every export and of
-  every error code with its cause and fix.
+  packages, Contributing, Links and License. It has a table of every export and
+  of every error code with its cause and fix.
 - `docs/API.md` has one heading per export and method, so the README links
   straight to each entry.
-- `llms.txt` adds "When to use", links to the errors table, and an Ecosystem
-  block.
+- `llms.txt` adds "When to use", links to the errors table, and ends with an
+  Ecosystem block: the package page, its release feed, the @vllnt package index,
+  package and docs search, vllnt and the author.
 - Every public export, `Buckets` method and component function has a TSDoc
   summary; `Buckets` links its package page with `@see`.
 - `package.json` `description` and `keywords` describe what the package does.
-- The README ends with links to the package page, vllnt open source, vllnt.com
-  and the author, and related @vllnt packages link their package pages.
+  The same description sentence opens the README and is the `llms.txt` summary.
+- A Links section lists the package page and release feed, the @vllnt package
+  index and search, the source, issues and npm, Discord and X, the company and
+  author, and sponsorship.
+- Related packages lists none: no other package works with this one in code
+  through a dependency, a shared test or an example.
+- The README ends with links to vllnt open source, the package page, vllnt.com
+  and the author.
 
 ## [0.1.1] - 2026-11-27
 

@@ -1,8 +1,7 @@
 # @vllnt/convex-buckets
 
-Convex component that stores short-lived groups of opaque subject refs, such as
-matches, lobbies, rooms and cohorts, with capacity limits and an open, locked,
-closed lifecycle.
+TypeScript Convex component for short-lived groups such as matches, lobbies and
+rooms: capacity-limited joins, open/locked/closed lifecycle, batched erase.
 
 ## For coding agents
 
@@ -343,19 +342,22 @@ Report vulnerabilities as described in
 
 ## Related packages
 
-- [`@vllnt/convex-memberships`](https://oss.vllnt.com/packages/convex-memberships):
-  standing memberships and roles (orgs, teams). Use it when the group outlives a
-  session.
-- [`@convex-dev/presence`](https://www.npmjs.com/package/@convex-dev/presence):
-  who is online now. Buckets has no heartbeat.
-- [`@vllnt/convex-invitations`](https://oss.vllnt.com/packages/convex-invitations):
-  single-use, expiring invitations. Call `join` from the host after an
-  invitation is accepted.
+None. This package has no dependency, shared test or example with another
+package.
 
 ## Contributing
 
 See
 [CONTRIBUTING.md](https://github.com/vllnt/convex-buckets/blob/main/CONTRIBUTING.md).
+
+## Links
+
+- Docs and changelog: [oss.vllnt.com/packages/convex-buckets](https://oss.vllnt.com/packages/convex-buckets) · [release feed](https://oss.vllnt.com/packages/convex-buckets/rss.xml)
+- All @vllnt packages: [oss.vllnt.com](https://oss.vllnt.com) · [search packages and docs on index.vllnt.com](https://index.vllnt.com)
+- Source and issues: [GitHub](https://github.com/vllnt/convex-buckets) · [issues](https://github.com/vllnt/convex-buckets/issues) · [npm](https://www.npmjs.com/package/@vllnt/convex-buckets)
+- Questions and updates: [Discord](https://bntvllnt.com/discord) · [X @bntvllnt](https://x.com/bntvllnt)
+- Company and author: [vllnt.com](https://vllnt.com) · [bntvllnt.com](https://bntvllnt.com) · [GitHub @bntvllnt](https://github.com/bntvllnt) · [LinkedIn](https://linkedin.com/in/bntvllnt)
+- Sponsor: [GitHub Sponsors](https://github.com/sponsors/bntvllnt)
 
 ## License
 

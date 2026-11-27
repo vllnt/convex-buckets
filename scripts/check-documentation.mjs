@@ -27,6 +27,7 @@ export const SECTIONS = [
   "Security",
   "Related packages",
   "Contributing",
+  "Links",
   "License",
 ];
 const FIRST_LINES = 40;
@@ -39,6 +40,7 @@ const OSS = "https://oss.vllnt.com";
  * @typedef {{ name: string, target: ts.Symbol }} Export
  * @typedef {{ checker: ts.TypeChecker, entry: string, symbols: Export[] }} Entry
  * @typedef {{ headings: Set<string>, table: string }} Documented
+ * @typedef {string | { url?: unknown }} Repository
  */
 
 /** @param {string} name package name without the scope */
@@ -47,7 +49,30 @@ export const footer = (name) =>
 
 /** @param {string} name package name without the scope */
 export const ecosystem = (name) =>
-  `## Ecosystem\n\n- [Package page](${OSS}/packages/${name})\n- [All @vllnt packages](${OSS}/llms.txt)\n- [vllnt](https://vllnt.com/llms.txt)\n- [Author](https://bntvllnt.com)\n`;
+  [
+    "## Ecosystem\n",
+    `- [Package page](${OSS}/packages/${name})`,
+    `- [Release feed](${OSS}/packages/${name}/rss.xml)`,
+    `- [All @vllnt packages](${OSS}/llms.txt)`,
+    "- [Search vllnt packages and docs](https://index.vllnt.com)",
+    "- [vllnt](https://vllnt.com/llms.txt)",
+    "- [Author](https://bntvllnt.com)\n",
+  ].join("\n");
+
+/**
+ * Body of the README `## Links` section.
+ * @param {string} name package name without the scope
+ * @param {string} repository GitHub repository URL without `.git`
+ */
+export const links = (name, repository) =>
+  [
+    `- Docs and changelog: [oss.vllnt.com/packages/${name}](${OSS}/packages/${name}) · [release feed](${OSS}/packages/${name}/rss.xml)`,
+    `- All @vllnt packages: [oss.vllnt.com](${OSS}) · [search packages and docs on index.vllnt.com](https://index.vllnt.com)`,
+    `- Source and issues: [GitHub](${repository}) · [issues](${repository}/issues) · [npm](https://www.npmjs.com/package/@vllnt/${name})`,
+    "- Questions and updates: [Discord](https://bntvllnt.com/discord) · [X @bntvllnt](https://x.com/bntvllnt)",
+    "- Company and author: [vllnt.com](https://vllnt.com) · [bntvllnt.com](https://bntvllnt.com) · [GitHub @bntvllnt](https://github.com/bntvllnt) · [LinkedIn](https://linkedin.com/in/bntvllnt)",
+    "- Sponsor: [GitHub Sponsors](https://github.com/sponsors/bntvllnt)",
+  ].join("\n");
 
 /** GitHub heading anchor. @param {string} heading */
 export const slug = (heading) =>
@@ -406,6 +431,32 @@ function checkMetadata({ description, keywords }) {
   assert.ok(unique.size >= 8 && unique.size <= 12, "8 to 12 keywords");
 }
 
+/**
+ * The package.json description opens the README and is the llms.txt summary;
+ * the README Links section and footer match the shared blocks.
+ * @param {Record<string, string>} texts
+ * @param {Section[]} parts
+ * @param {{ description?: unknown, name: string, repository?: Repository }} metadata
+ */
+function checkIdentity(texts, parts, metadata) {
+  const description = String(metadata.description);
+  const readme = String(texts["README.md"]);
+  const title = readme.indexOf("\n");
+  const intro = readme.slice(title, readme.indexOf("\n## ", title)).trim();
+  const sentence = intro.replaceAll(/\s*\n\s*/gu, " ");
+  assert.equal(sentence, description, "README intro: package.json description");
+  const summary = String(texts["llms.txt"]).split("\n");
+  assert.ok(summary.includes(`> ${description}`), "llms.txt: > <description>");
+  const { repository } = metadata;
+  const source = typeof repository === "object" ? repository.url : repository;
+  assert.ok(typeof source === "string", "package.json needs repository.url");
+  const url = source.replace(/^git\+/u, "").replace(/\.git$/u, "");
+  const name = metadata.name.split("/").at(-1) ?? metadata.name;
+  const body = section(parts, "Links").body.trim();
+  assert.equal(body, links(name, url), "README Links: the shared block");
+  assert.ok(readme.endsWith(footer(name)), "README ends with the vllnt footer");
+}
+
 /** Shipped docs keyed by package-relative path. @param {string} installed */
 function readTexts(installed) {
   const references = readdirSync(join(installed, "docs")).map(
@@ -424,7 +475,7 @@ function readTexts(installed) {
  * @param {string} consumer project that has the package installed
  */
 export function checkDocumentation(installed, consumer) {
-  /** @type {{ description?: unknown, exports: Record<string, unknown>, keywords?: unknown, name: string }} */
+  /** @type {{ description?: unknown, exports: Record<string, unknown>, keywords?: unknown, name: string, repository?: Repository }} */
   const metadata = JSON.parse(
     readFileSync(join(installed, "package.json"), "utf8"),
   );
@@ -435,6 +486,7 @@ export function checkDocumentation(installed, consumer) {
   const reference = String(texts["docs/API.md"]);
   const parts = checkStructure(readme, metadata.name);
   checkWhenToUse(parts);
+  checkIdentity(texts, parts, metadata);
   checkTop(readme, metadata.name);
   checkLinks(installed, texts);
   checkApi(consumer, metadata, {
@@ -449,7 +501,6 @@ export function checkDocumentation(installed, consumer) {
     section(parts, "Errors and fixes").body,
     reference,
   );
-  assert.ok(readme.endsWith(footer(name)), "README ends with the vllnt footer");
   checkLlms(String(texts["llms.txt"]), name);
   checkBacklinks(installed, texts);
   return checkCode(texts);

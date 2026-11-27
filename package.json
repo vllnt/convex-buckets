@@ -1,7 +1,7 @@
 {
   "name": "@vllnt/convex-buckets",
   "version": "0.1.1",
-  "description": "Convex component for short-lived groups such as matches, lobbies and rooms: capacity-limited joins, open/locked/closed lifecycle, batched erase. TypeScript.",
+  "description": "TypeScript Convex component for short-lived groups such as matches, lobbies and rooms: capacity-limited joins, open/locked/closed lifecycle, batched erase.",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.34.8",
