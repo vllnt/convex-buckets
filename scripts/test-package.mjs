@@ -1,5 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
@@ -45,6 +52,28 @@ try {
     "vite@8.2.2",
     "@types/node@22.20.2",
   ]);
+  // Agents read the bundled docs from node_modules, so they must ship and resolve.
+  const installed = join(temporary, "node_modules", metadata.name);
+  const missing = [
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "llms.txt",
+    ...readdirSync(join(root, "docs")).map((file) => `docs/${file}`),
+  ].filter((file) => !existsSync(join(installed, file)));
+  if (missing.length > 0)
+    throw new Error(`tarball is missing ${missing.join(", ")}`);
+  const broken = ["README.md", "llms.txt"]
+    .flatMap((file) =>
+      [
+        ...readFileSync(join(installed, file), "utf8").matchAll(
+          /\]\((?!https?:|#)([^)\s#]+)/gu,
+        ),
+      ].map((match) => String(match[1])),
+    )
+    .filter((link) => !existsSync(join(installed, link)));
+  if (broken.length > 0)
+    throw new Error(`links not in the tarball: ${broken.join(", ")}`);
   writeFileSync(
     join(temporary, "consumer.ts"),
     `

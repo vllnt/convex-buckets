@@ -44,7 +44,7 @@
     "build:clean": "rm -rf dist *.tsbuildinfo && pnpm build:codegen",
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc/typecheck.tsbuildinfo",
     "typecheck:ci": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc/typecheck-ci.tsbuildinfo --project tsconfig.ci.json",
-    "lint": "pnpm check:agents && pnpm check:release && eslint --cache --cache-location node_modules/.cache/eslint/ . --max-warnings 0",
+    "lint": "pnpm check:agents && pnpm check:release && pnpm generate:llms && eslint --cache --cache-location node_modules/.cache/eslint/ . --max-warnings 0",
     "test": "pnpm typecheck:tests && vitest run",
     "test:watch": "vitest --typecheck --clearScreen false",
     "test:coverage": "pnpm typecheck:tests && vitest run --coverage --coverage.reporter=text",
@@ -88,7 +88,7 @@
       "handlebars@<4.7.10": "4.7.10"
     }
   },
-  "homepage": "https://github.com/vllnt/convex-buckets#readme",
+  "homepage": "https://oss.vllnt.com/packages/convex-buckets",
   "bugs": {
     "url": "https://github.com/vllnt/convex-buckets/issues"
   },

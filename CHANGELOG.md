@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Documentation
+
+- The package now tells coding agents where its version-matched docs are:
+  `node_modules/@vllnt/convex-buckets/docs/`, with `llms.txt` and this
+  changelog. `llms.txt` and the README each have a "For coding agents" note.
+- `llms.txt` links the files shipped in the package relatively (`./docs/API.md`,
+  `./CHANGELOG.md`), so they match the installed version, and adds an Ecosystem
+  link to `https://oss.vllnt.com/llms.txt`.
+- `docs/API.md` lists the import entry points and exported types.
+- The README has a "Related packages" section, and `homepage` points at
+  `https://oss.vllnt.com/packages/convex-buckets`.
+
+### Release process
+
+- Canary builds now publish on every push to `main` that touches the package or
+  its shipped docs.
+
 ## [0.1.0] - 2026-11-23
 
 First stable release. Earlier builds were published only under the `canary`

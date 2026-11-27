@@ -1,6 +1,19 @@
 # API Reference — @vllnt/convex-buckets
 
-**Compatibility:** `convex@^1.45.0`
+**Compatibility:** `convex@^1.45.0`, Node.js `>=20.19.0`
+
+## Entry points
+
+| Import                                                  | Exports                                                                                                                                |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `@vllnt/convex-buckets`                                 | `Buckets` class; types `BucketsComponent`, `BucketsOptions`, `BucketState`, `BucketStatus`, `JoinResult`, `MemberState`, `OpenOptions` |
+| `@vllnt/convex-buckets/convex.config` (or `.js`)        | default component config for `app.use(...)`                                                                                            |
+| `@vllnt/convex-buckets/test`                            | `register(t, name = "buckets")` for `convex-test` (TypeScript source; needs Vite `import.meta.glob`)                                   |
+| `@vllnt/convex-buckets/_generated/component` (or `.js`) | type `ComponentApi`                                                                                                                    |
+
+`JoinResult.reason` is typed `string`; the values are listed under `join`.
+
+## `Buckets` client
 
 ```ts
 import { Buckets } from "@vllnt/convex-buckets";
@@ -77,6 +90,7 @@ for `_creationTime`; it is not a safe generation boundary.
 Batch sizes and preview limits must be positive safe integers and are clamped to
 their maximum. Invalid refs, capacity, batch and limit produce code-tagged
 `ConvexError`s whose `data` is `{ code, message }` (`INVALID_REF`,
-`INVALID_CAPACITY`, `INVALID_BATCH`, `INVALID_LIMIT`). Scope, bucket and subject
-refs enforce 1..256 characters, including reads. The host must authorize scope;
-it is not an access-control boundary.
+`INVALID_CAPACITY`, `INVALID_BATCH`, `INVALID_LIMIT`; `open` with a taken
+`bucketRef` throws `BUCKET_EXISTS`). Scope, bucket and subject refs enforce
+1..256 characters, including reads. The host must authorize scope; it is not an
+access-control boundary.

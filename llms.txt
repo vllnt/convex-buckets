@@ -21,12 +21,18 @@ memberCount, openedAt, capacity?, lockedAt?, closedAt? }` or null. Erasure batch
 default to 200 and clamp to 500. Named mounts isolate state and scheduled work.
 No automatic expiry, React entry or heartbeat is provided.
 
+## For coding agents
+
+The docs are bundled in the package at `node_modules/@vllnt/convex-buckets/docs/`
+and match the installed version. Read them, and the shipped `src/`, before
+writing code. The links below to `./` paths are files inside the installed package.
+
 ## Docs
 
-- [README](https://github.com/vllnt/convex-buckets/blob/main/README.md): Project overview, installation, usage examples, architecture
-- [API Reference](https://github.com/vllnt/convex-buckets/blob/main/docs/API.md): Public class methods, return shapes, input validation
-- [Changelog](https://github.com/vllnt/convex-buckets/blob/main/CHANGELOG.md): Version history and release notes
-- [Contributing](https://github.com/vllnt/convex-buckets/blob/main/CONTRIBUTING.md): Development setup, validation commands, release workflow
+- [README](./README.md): Project overview, installation, usage examples, architecture
+- [API Reference](./docs/API.md): Entry points, public class methods, return shapes, input validation
+- [Changelog](./CHANGELOG.md): Version history and release notes
+- [Contributing](https://github.com/vllnt/convex-buckets/blob/main/CONTRIBUTING.md): Development setup, validation commands, release workflow (repository only)
 
 ## Examples
 
@@ -36,7 +42,11 @@ No automatic expiry, React entry or heartbeat is provided.
 
 ## Optional
 
-- [AGENTS](https://github.com/vllnt/convex-buckets/blob/main/AGENTS.md): Canonical agent instructions for this repository
+- [AGENTS](https://github.com/vllnt/convex-buckets/blob/main/AGENTS.md): Contributor instructions for working in this repository (repository only)
 - [Security Policy](https://github.com/vllnt/convex-buckets/blob/main/SECURITY.md): Vulnerability reporting policy
 - [Code of Conduct](https://github.com/vllnt/convex-buckets/blob/main/CODE_OF_CONDUCT.md): Community participation guidelines
-- [License](https://github.com/vllnt/convex-buckets/blob/main/LICENSE): MIT license
+- [License](./LICENSE): MIT license
+
+## Ecosystem
+
+- [vllnt oss](https://oss.vllnt.com/llms.txt): Index of every @vllnt package
