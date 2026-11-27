@@ -1,6 +1,6 @@
 {
   "name": "@vllnt/convex-buckets",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ephemeral groups of opaque subject refs \u2014 matches, lobbies, cohorts \u2014 as a Convex component",
   "license": "MIT",
   "type": "module",

@@ -6,6 +6,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-27
+
+Documentation and packaging only. The component code, the compiled `dist` and
+the `convex@^1.45.0` peer range are unchanged from 0.1.0.
+
 ### Documentation
 
 - The package now tells coding agents where its version-matched docs are:
