@@ -283,9 +283,8 @@ Convex argument validation before the component runs.
 
 ## Testing
 
-Mount the component in your own `convex-test` suite with `register`. Vitest must
-run in the edge runtime and transform this package, because the helper is
-TypeScript source that uses `import.meta.glob`:
+Mount the component in your own `convex-test` suite with `register`. Use the
+Vitest settings `convex-test` recommends (edge runtime, `convex-test` inlined):
 
 ```ts
 // vitest.config.mts
@@ -294,7 +293,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "edge-runtime",
-    server: { deps: { inline: ["convex-test", "@vllnt/convex-buckets"] } },
+    server: { deps: { inline: ["convex-test"] } },
   },
 });
 ```
