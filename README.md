@@ -254,6 +254,8 @@ Convex argument validation before the component runs.
   is clamped to 500 without an error, and nothing tells you more exist.
 - `paginateMembers` requires `numItems` in 1..500 and is not a frozen snapshot
   under concurrent writes.
+- `listMembers` and `paginateMembers` return members in membership creation
+  order. A member who leaves and joins again moves to the end.
 - Erase batches default to 200; a batch above 500 is clamped to 500.
 - `eraseBucket` returns only the rows deleted by that call. The ref stays
   reserved (`BUCKET_EXISTS`) until `get` returns `null`. `close` keeps the
@@ -282,7 +284,9 @@ Convex argument validation before the component runs.
 - Node.js 22 or later for convex 1.49 and newer, which require it.
 - `@vllnt/convex-buckets/test` needs `convex-test`, `vitest`, `vite` and
   `@edge-runtime/vm`, with the Vitest config shown under Testing. Add `vite` as
-  a direct dev dependency: the example's `vite/client` types come from it.
+  a direct dev dependency: the example's `vite/client` types come from it. On
+  convex 1.45, pin `convex-test` to 0.0.71 or older: 0.0.72 and newer require
+  `convex@^1.46.0` and fail strict `tsc` against convex 1.45.
 - React: not applicable. The package is backend-only and has no `./react` entry.
 
 ## Testing

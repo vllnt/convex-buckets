@@ -262,5 +262,8 @@ test("a host sees the error code in ConvexError data", async () => {
       return error instanceof ConvexError ? (error.data as unknown) : null;
     }
   });
-  expect(data).toMatchObject({ code: "BUCKET_EXISTS" });
+  expect(data).toEqual({
+    code: "BUCKET_EXISTS",
+    message: "a bucket with this ref already exists in the scope",
+  });
 });
