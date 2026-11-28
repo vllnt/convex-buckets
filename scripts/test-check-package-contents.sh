@@ -87,6 +87,15 @@ commit_tree
 run "packed test file is denied" 1
 grep -q 'DENY  src/index.test.ts' <<< "$LAST_OUTPUT" || { echo "FAIL test path not denied" >&2; failures=$((failures + 1)); }
 
+# ESM and CommonJS TypeScript test files are denied too
+for suffix in test.mts test.cts spec.mts spec.cts; do
+  rm -f "$REPO/src/index."*
+  printf 'test()\n' > "$REPO/src/index.$suffix"
+  commit_tree
+  run "packed .$suffix file is denied" 1
+  grep -q "DENY  src/index.$suffix" <<< "$LAST_OUTPUT" || { echo "FAIL .$suffix path not denied" >&2; failures=$((failures + 1)); }
+done
+
 # Denylist hit inside dist
 rm -rf "$REPO/src"
 write_pkg '{"name":"fixture-pack","version":"1.0.0","files":["dist"]}'
