@@ -35,6 +35,7 @@ test("cleanup closes immediately and counts remaining rows", async () => {
       "BUCKET_EXISTS",
     );
     await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(await t.query(api.queries.get, ref)).toBeNull();
   } finally {
     vi.useRealTimers();
   }
