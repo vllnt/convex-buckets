@@ -3,7 +3,8 @@
 > TypeScript Convex component for short-lived groups such as matches, lobbies and rooms: capacity-limited joins, open/locked/closed lifecycle, batched erase.
 
 Install `@vllnt/convex-buckets` (unreleased builds from `main` use the `canary`
-dist-tag). Peer dependency `convex@^1.45.0`; Node.js `>=20.19.0`. Mount it with
+dist-tag). Peer dependency `convex@^1.45.0`; Node.js `>=20.19.0` (Node.js 22 or
+later for convex 1.49 and newer, which require it). Mount it with
 `app.use(config)` from `@vllnt/convex-buckets/convex.config` and call it through
 `new Buckets(components.buckets)` from host mutations and queries. Methods:
 `open`, `join`, `leave`, `lock`, `close`, `get`, `listMembers`,

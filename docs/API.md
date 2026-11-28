@@ -1,6 +1,7 @@
 # API Reference — @vllnt/convex-buckets
 
-**Compatibility:** `convex@^1.45.0`, Node.js `>=20.19.0`
+**Compatibility:** `convex@^1.45.0`, Node.js `>=20.19.0`. Node.js 22 or later
+for convex 1.49 and newer, which require it.
 
 ## Entry points
 
@@ -92,7 +93,8 @@ listMembers(ctx, bucketRef: string, scope?: string, limit?: number): Promise<Mem
 
 Returns a bounded preview: `limit` defaults to 100, and values above 500 are
 clamped to 500. It does not indicate truncation; use `paginateMembers` to read
-every member.
+every member. Members come in the same order as `paginateMembers`: membership
+creation order, so a member who leaves and joins again moves to the end.
 
 ### `paginateMembers`
 
@@ -104,8 +106,9 @@ paginateMembers(ctx, bucketRef: string, paginationOpts: PaginationOptions, scope
 `{ cursor: null, numItems: 100 }`, then pass the returned `continueCursor` until
 `isDone`. `numItems` must be an integer in 1..500. Returns
 `{ page: { subjectRef, joinedAt }[], isDone, continueCursor }`, ordered by
-membership creation within the scope and bucket. Pagination across separate
-calls is not a frozen snapshot under concurrent writes.
+membership creation within the scope and bucket, so a member who leaves and
+joins again moves to the end. Pagination across separate calls is not a frozen
+snapshot under concurrent writes.
 
 ### `eraseBucket`
 
